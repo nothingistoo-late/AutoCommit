@@ -21,7 +21,7 @@ class Program
             // Thực hiện Git commands
             RunGitCommand("git add .");
             RunGitCommand($"git commit -m \"{commitMessage}\"");
-            RunGitCommand("git push origin main");
+            RunGitCommand("git push origin master");
 
             Console.WriteLine("✅ Auto commit thành công!");
         }

@@ -27,15 +27,18 @@ class Program
             // Nếu push lỗi do cần fetch trước
             if (pushResult.Contains("rejected") || pushResult.Contains("failed to push"))
             {
-                Console.WriteLine("⚠️ Push bị từ chối, tiến hành pull --rebase...");
+                Console.WriteLine("⚠️ Push bị từ chối, tiến hành pull --rebase --strategy-option=theirs...");
 
-                var pullResult = RunGitCommandWithOutput("git pull --rebase origin master");
+                var pullResult = RunGitCommandWithOutput("git pull --rebase --strategy-option=theirs origin master");
 
-                // Nếu có conflict
+                // Nếu có conflict (trong trường hợp hy hữu dù đã strategy-option)
                 if (pullResult.Contains("CONFLICT"))
                 {
-                    Console.WriteLine("❌ Lỗi conflict khi pull. Vui lòng xử lý conflict thủ công.");
-                    Console.WriteLine(pullResult);
+                    string conflictLogPath = Path.Combine(repoPath, "conflict_log.txt");
+                    File.AppendAllText(conflictLogPath,
+                        $"[❌ {DateTime.Now}] Conflict detected during rebase:\n{pullResult}\n\n");
+
+                    Console.WriteLine("❌ Vẫn còn conflict. Đã ghi log vào conflict_log.txt.");
                 }
                 else
                 {
@@ -43,6 +46,11 @@ class Program
                     Console.WriteLine("✅ Pull thành công, đẩy lại lên GitHub...");
                     var finalPushResult = RunGitCommandWithOutput("git push origin master");
                     Console.WriteLine(finalPushResult);
+
+                    // Ghi log đẩy thành công vào conflict_log.txt
+                    string conflictLogPath = Path.Combine(repoPath, "conflict_log.txt");
+                    File.AppendAllText(conflictLogPath,
+                        $"[✅ {DateTime.Now}] Pull & push after auto-resolve success.\n\n");
                 }
             }
             else
@@ -53,6 +61,11 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Lỗi: {ex.Message}");
+
+            // Ghi log lỗi vào conflict_log.txt
+            string conflictLogPath = Path.Combine(repoPath, "conflict_log.txt");
+            File.AppendAllText(conflictLogPath,
+                $"[❌ {DateTime.Now}] Exception: {ex.Message}\n\n");
         }
     }
 

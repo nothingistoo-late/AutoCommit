@@ -8,6 +8,7 @@ class Program
 
     static void Main()
     {
+        // siuuu
         string commitMessage = $"Auto commit - {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
 
         try

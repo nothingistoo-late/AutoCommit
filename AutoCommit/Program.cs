@@ -4,53 +4,44 @@ using System.IO;
 
 class Program
 {
+    static string repoPath = @"D:\API\AutoCommit"; // Thay bằng repo của đại ca
+
     static void Main()
     {
-        string repoPath = @"D:\API\AutoCommit"; // Thay bằng đường dẫn repo của đại ca
-        string commitMessage = $"Auto commit - {DateTime.Now}";
+        string commitMessage = $"Auto commit - {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
 
         try
         {
-            Directory.SetCurrentDirectory(repoPath);
-
-            // Ghi nội dung vào file log (để có thay đổi mà commit)
+            // Ghi log để tạo thay đổi
             string logFilePath = Path.Combine(repoPath, "autocommit_log.txt");
-            File.AppendAllText(logFilePath, $"Commit at {DateTime.Now}\n");
+            File.AppendAllText(logFilePath, $"Commit at {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n");
 
-            // Thêm và commit
-            RunGitCommand("git add .");
-            RunGitCommand($"git commit -m \"{commitMessage}\"");
+            // Add và commit
+            RunGitCommand("add .");
+            RunGitCommand($"commit -m \"{commitMessage}\"");
 
-            // Thử push lên
-            var pushResult = RunGitCommandWithOutput("git push origin master");
+            // Push lần đầu
+            var pushResult = RunGitCommandWithOutput("push origin master");
 
-            // Nếu push lỗi do cần fetch trước
+            // Nếu bị từ chối do chưa pull
             if (pushResult.Contains("rejected") || pushResult.Contains("failed to push"))
             {
                 Console.WriteLine("⚠️ Push bị từ chối, tiến hành pull --rebase --strategy-option=theirs...");
 
-                var pullResult = RunGitCommandWithOutput("git pull --rebase --strategy-option=theirs origin master");
+                var pullResult = RunGitCommandWithOutput("pull --rebase --strategy-option=theirs origin master");
 
-                // Nếu có conflict (trong trường hợp hy hữu dù đã strategy-option)
                 if (pullResult.Contains("CONFLICT"))
                 {
-                    string conflictLogPath = Path.Combine(repoPath, "conflict_log.txt");
-                    File.AppendAllText(conflictLogPath,
-                        $"[❌ {DateTime.Now}] Conflict detected during rebase:\n{pullResult}\n\n");
-
+                    LogConflict($"[❌ {DateTime.Now:yyyy-MM-dd HH:mm:ss}] Conflict detected:\n{pullResult}");
                     Console.WriteLine("❌ Vẫn còn conflict. Đã ghi log vào conflict_log.txt.");
                 }
                 else
                 {
-                    // Nếu pull ok thì push lại
                     Console.WriteLine("✅ Pull thành công, đẩy lại lên GitHub...");
-                    var finalPushResult = RunGitCommandWithOutput("git push origin master");
+                    var finalPushResult = RunGitCommandWithOutput("push origin master");
                     Console.WriteLine(finalPushResult);
 
-                    // Ghi log đẩy thành công vào conflict_log.txt
-                    string conflictLogPath = Path.Combine(repoPath, "conflict_log.txt");
-                    File.AppendAllText(conflictLogPath,
-                        $"[✅ {DateTime.Now}] Pull & push after auto-resolve success.\n\n");
+                    LogConflict($"[✅ {DateTime.Now:yyyy-MM-dd HH:mm:ss}] Pull & push sau rebase thành công.\n");
                 }
             }
             else
@@ -61,61 +52,57 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Lỗi: {ex.Message}");
-
-            // Ghi log lỗi vào conflict_log.txt
-            string conflictLogPath = Path.Combine(repoPath, "conflict_log.txt");
-            File.AppendAllText(conflictLogPath,
-                $"[❌ {DateTime.Now}] Exception: {ex.Message}\n\n");
+            LogConflict($"[❌ {DateTime.Now:yyyy-MM-dd HH:mm:ss}] Exception: {ex.Message}");
         }
     }
 
-    static void RunGitCommand(string command)
+    static void RunGitCommand(string args)
     {
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                RedirectStandardInput = true,
+                FileName = "git",
+                Arguments = args,
+                WorkingDirectory = repoPath,
                 UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 CreateNoWindow = true
             }
         };
 
         process.Start();
-        process.StandardInput.WriteLine(command);
-        process.StandardInput.WriteLine("exit");
-        process.StandardInput.Flush();
-        process.StandardInput.Close();
         process.WaitForExit();
     }
 
-    static string RunGitCommandWithOutput(string command)
+    static string RunGitCommandWithOutput(string args)
     {
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                RedirectStandardInput = true,
+                FileName = "git",
+                Arguments = args,
+                WorkingDirectory = repoPath,
+                UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                UseShellExecute = false,
                 CreateNoWindow = true
             }
         };
 
         process.Start();
-        process.StandardInput.WriteLine(command);
-        process.StandardInput.WriteLine("exit");
-        process.StandardInput.Flush();
-        process.StandardInput.Close();
-
         string output = process.StandardOutput.ReadToEnd();
         string error = process.StandardError.ReadToEnd();
-
         process.WaitForExit();
 
         return output + error;
+    }
+
+    static void LogConflict(string content)
+    {
+        string conflictLogPath = Path.Combine(repoPath, "conflict_log.txt");
+        File.AppendAllText(conflictLogPath, content + "\n\n");
     }
 }

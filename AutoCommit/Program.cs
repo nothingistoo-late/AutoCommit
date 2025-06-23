@@ -6,7 +6,7 @@ class Program
 {
     static void Main()
     {
-        string repoPath = @"D:\API\AutoCommit"; // Thay bằng đường dẫn repo của bạn
+        string repoPath = @"D:\Tool\AutoCommit"; // Thay bằng đường dẫn repo của bạn
         string commitMessage = $"Auto commit - {DateTime.Now}";
 
         try

@@ -9,12 +9,12 @@ class Program
     /// <summary>Số commit tối đa mỗi lần chạy (>= MinCommitsPerRun).</summary>
     const int MaxCommitsPerRun = 10;
 
-    static void Main()
+    static void Main(string[] args)
     {
-        string repoPath = @"D:\Tool\AutoCommit"; // Thay bằng đường dẫn repo của bạn
-
         try
         {
+            string repoPath = ResolveRepositoryRoot(args);
+            Console.WriteLine($"Repo: {repoPath}");
             Directory.SetCurrentDirectory(repoPath);
 
             // Lấy min của hai lần random → tỉ lệ số commit nhỏ cao hơn (ít khi ra nhiều commit).
@@ -51,6 +51,58 @@ class Program
         int a = Random.Shared.Next(min, max + 1);
         int b = Random.Shared.Next(min, max + 1);
         return Math.Min(a, b);
+    }
+
+    /// <summary>
+    /// 1) Có tham số: dùng đường dẫn đó (bất kỳ thư mục con nào trong repo cũng được), đi lên tìm .git.
+    /// 2) Không tham số: thử <see cref="Environment.CurrentDirectory"/> rồi thư mục chạy app (BaseDirectory), mỗi nơi đều đi lên tìm .git.
+    /// </summary>
+    static string ResolveRepositoryRoot(string[] args)
+    {
+        if (args.Length > 0)
+        {
+            string path = Path.GetFullPath(args[0].Trim());
+            if (!Directory.Exists(path))
+                throw new DirectoryNotFoundException(
+                    $"Không tìm thấy thư mục: {path}. Chương trình không chạy tiếp.");
+
+            string? fromArg = FindGitRepositoryRoot(path);
+            if (fromArg != null)
+                return fromArg;
+
+            throw new InvalidOperationException(
+                "Không phát hiện repo Git (không có .git trên đường dẫn đã cho). Chương trình không chạy — không commit, không push.");
+        }
+
+        foreach (string start in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+        {
+            if (string.IsNullOrWhiteSpace(start) || !Directory.Exists(start))
+                continue;
+
+            string? root = FindGitRepositoryRoot(Path.GetFullPath(start));
+            if (root != null)
+                return root;
+        }
+
+        throw new InvalidOperationException(
+            "Không phát hiện repo Git (không có .git). Chương trình không chạy — không commit, không push. " +
+            "Với Task Scheduler: đặt \"Start in\" vào thư mục repo. Hoặc chạy: AutoCommit.exe \"<đường dẫn trong repo>\"");
+    }
+
+    static string? FindGitRepositoryRoot(string startPath)
+    {
+        var dir = new DirectoryInfo(startPath);
+        if (!dir.Exists)
+            return null;
+
+        for (DirectoryInfo? d = dir; d != null; d = d.Parent)
+        {
+            string gitPath = Path.Combine(d.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
+                return d.FullName;
+        }
+
+        return null;
     }
 
     static void RunGitCommand(string command)

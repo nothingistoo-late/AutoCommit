@@ -9,6 +9,7 @@
 - Số commit được chọn theo phân phối **lệch về số nhỏ** (`min` của hai lần random) để thường xuyên chỉ vài commit, ít khi quá nhiều.
 - Sau khi commit xong hết trong lần chạy, **một lần** `git push` lên remote (hiện tại `origin master` trong code).
 - Mỗi commit ghi thêm dòng vào `autocommit_log.txt` để luôn có thay đổi để commit.
+- **Đường dẫn repo** tự nhận: đi lên từ thư mục làm việc (hoặc thư mục chứa `.exe`) cho tới khi gặp `.git`; có thể truyền thêm đối số dòng lệnh nếu cần.
 
 Chỉnh khoảng số commit trong `AutoCommit/Program.cs`: hằng `MinCommitsPerRun` và `MaxCommitsPerRun`.
 
@@ -32,7 +33,7 @@ Mục đích:
 ## Cách hoạt động (v2)
 
 1. **Task Scheduler** (hoặc chạy tay) gọi bản build `AutoCommit.exe` (hoặc `dotnet run` trong thư mục project).
-2. Ứng dụng đổi working directory tới `repoPath` trong `Program.cs`, rồi lặp:
+2. Ứng dụng **tự tìm gốc Git** (thư mục có `.git`), đặt đó làm working directory, rồi lặp:
    - Ghi thêm một dòng vào `autocommit_log.txt`
    - `git add .`
    - `git commit -m "Auto commit (i/total) - ..."`
@@ -59,9 +60,13 @@ git clone https://github.com/nothingistoo-late/AutoCommitApp.git
 cd AutoCommitApp
 ```
 
-### 2. Cấu hình repo trong code
+### 2. Repo cần auto commit (không cần sửa đường dẫn trong code)
 
-Trong `AutoCommit/Program.cs`, sửa `repoPath` trỏ đúng thư mục repo cần auto commit (và chỉnh `git push` nếu branch không phải `master`).
+- **Task Scheduler:** đặt **Start in** (thư mục bắt đầu) là thư mục gốc repo (hoặc bất kỳ thư mục con nào trong repo). App sẽ đi lên cha cho tới khi thấy `.git`.
+- **Chạy tay:** `cd` vào repo rồi chạy `AutoCommit.exe`, hoặc `dotnet run --project AutoCommit` từ trong repo.
+- **Tuỳ chọn:** `AutoCommit.exe "D:\path\to\bất kỳ thư mục nào trong repo"` — vẫn tự tìm lên tới gốc `.git`.
+
+Nếu branch mặc định không phải `master`, sửa lệnh `git push` trong `Program.cs`.
 
 ### 3. Build
 
@@ -76,6 +81,7 @@ File chạy thường nằm tại: `AutoCommit/bin/Release/net8.0/AutoCommit.exe
 
 - **Create Task** → trigger **Daily** theo giờ bạn chọn
 - **Action**: Start a program → đường dẫn tới `AutoCommit.exe`
+- **Start in**: đường dẫn tới thư mục gốc repo (để tự nhận repo đúng)
 - Đảm bảo user chạy task có `git` và credential push
 
 ---

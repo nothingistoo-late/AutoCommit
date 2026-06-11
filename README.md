@@ -1,93 +1,111 @@
 
-# 🕒 Auto Commit App
+# Auto Commit App
 
-## 📌 Giới thiệu
-**Auto Commit App** là một ứng dụng nhỏ sử dụng **Git** và **Task Scheduler** để:
-- Tự động commit các thay đổi trong thư mục dự án
-- Tự động push lên GitHub vào khung giờ cố định hàng ngày (hoặc theo lịch trình tùy chỉnh)
+## Phiên bản 2
+
+**Version 2** tập trung vào công cụ **C# (.NET 8)** trong thư mục `AutoCommit/`:
+
+- Mỗi lần chạy tạo **nhiều commit** (số lượng ngẫu nhiên trong khoảng cấu hình được), không còn cố định một commit.
+- Số commit được chọn theo phân phối **lệch về số nhỏ** (`min` của hai lần random) để thường xuyên chỉ vài commit, ít khi quá nhiều.
+- Sau khi commit xong hết trong lần chạy, **một lần** `git push` lên remote (hiện tại `origin master` trong code).
+- Mỗi commit ghi thêm dòng vào `autocommit_log.txt` để luôn có thay đổi để commit.
+
+Chỉnh khoảng số commit trong `AutoCommit/Program.cs`: hằng `MinCommitsPerRun` và `MaxCommitsPerRun`.
+
+---
+
+## Giới thiệu
+
+**Auto Commit App** dùng **Git** (và có thể kết hợp **Task Scheduler** trên Windows) để:
+
+- Tự động commit các thay đổi trong repo đã cấu hình
+- Tự động push lên remote theo lịch bạn đặt (ví dụ hằng ngày)
 
 Mục đích:
-- Giữ lịch sử làm việc đều đặn mỗi ngày
-- Duy trì **contribution streak** (chuỗi chấm xanh) trên GitHub
-- Tự động lưu trữ tiến độ công việc
+
+- Giữ lịch sử làm việc đều đặn
+- Duy trì **contribution graph** trên GitHub (nếu dùng cho mục đích đó)
+- Tự động lưu tiến độ qua file log + commit
 
 ---
 
-## ⚙️ Cách hoạt động
+## Cách hoạt động (v2)
 
-1. **Task Scheduler** sẽ tự động gọi file script vào đúng giờ, ví dụ `7:30 AM` mỗi ngày.
-2. Script sẽ:
-   - Thêm tất cả thay đổi vào Git:
-     ```bash
-     git add .
-     ```
-   - Tạo commit mới với nội dung tự động ghi ngày/giờ:
-     ```bash
-     git commit -m "Auto commit - ngày giờ"
-     ```
-   - Thử push lên GitHub:
-     ```bash
-     git push
-     ```
-3. Nếu không có mạng:
-   - Commit vẫn được lưu **ở local**
-   - Contribution vẫn được tính vào **ngày commit**
-   - Ngày mai có mạng → push lên đầy đủ
+1. **Task Scheduler** (hoặc chạy tay) gọi bản build `AutoCommit.exe` (hoặc `dotnet run` trong thư mục project).
+2. Ứng dụng đổi working directory tới `repoPath` trong `Program.cs`, rồi lặp:
+   - Ghi thêm một dòng vào `autocommit_log.txt`
+   - `git add .`
+   - `git commit -m "Auto commit (i/total) - ..."`
+3. Cuối vòng lặp: `git push origin master` (đổi branch/remote trong code nếu repo của bạn khác).
+
+Nếu không có mạng, commit vẫn nằm local; khi có mạng, chạy lại hoặc push sau sẽ đồng bộ remote.
 
 ---
 
-## 📝 Yêu cầu
-- Máy đã cài **Git**
-- Cấu hình **Git remote** sẵn với GitHub
-- Có sẵn **Task Scheduler** (hoặc cronjob) để chạy script định kỳ
+## Yêu cầu
+
+- **.NET 8 SDK** (để build project `AutoCommit/AutoCommit.csproj`)
+- **Git** trên PATH của tài khoản chạy task / terminal
+- Remote đã cấu hình và quyền push (HTTPS/SSH credential)
 
 ---
 
-## 🚀 Hướng dẫn cài đặt
+## Hướng dẫn cài đặt
 
-### 1️⃣ Tải về project
+### 1. Clone project
+
 ```bash
 git clone https://github.com/nothingistoo-late/AutoCommitApp.git
+cd AutoCommitApp
 ```
 
-### 2️⃣ Chỉnh sửa thông tin remote (nếu cần)
+### 2. Cấu hình repo trong code
+
+Trong `AutoCommit/Program.cs`, sửa `repoPath` trỏ đúng thư mục repo cần auto commit (và chỉnh `git push` nếu branch không phải `master`).
+
+### 3. Build
+
 ```bash
-git remote -v
-git remote set-url origin <your-github-repo-url>
+cd AutoCommit
+dotnet build -c Release
 ```
 
-### 3️⃣ Tạo Task Scheduler (Windows)
-- Mở **Task Scheduler**
-- Chọn **Create Basic Task**
-- Đặt lịch `Daily` lúc `7:30 AM`
-- Ở phần **Action** chọn:
-  - **Start a program**
-  - Trỏ tới file `.bat` hoặc script của dự án
+File chạy thường nằm tại: `AutoCommit/bin/Release/net8.0/AutoCommit.exe` (trên Windows).
+
+### 4. Task Scheduler (Windows, tùy chọn)
+
+- **Create Task** → trigger **Daily** theo giờ bạn chọn
+- **Action**: Start a program → đường dẫn tới `AutoCommit.exe`
+- Đảm bảo user chạy task có `git` và credential push
 
 ---
 
-## 📈 Kiểm tra trạng thái
+## Kiểm tra trạng thái
 
-### Xem commit local:
+### Xem log commit local
+
 ```bash
 git log
 ```
 
-### Kiểm tra commit chưa push:
+### Commit chưa push
+
 ```bash
 git log origin/master..HEAD
 ```
 
----
-
-## 💡 Ghi chú
-- Contribution sẽ tính theo **ngày commit**, không phải **ngày push**
-- Khi mất mạng:
-  - Commit vẫn được lưu **local**
-  - Khi push sau, GitHub vẫn tính đúng ngày
+(Đổi `master` nếu branch mặc định của bạn khác.)
 
 ---
 
-## 📮 Liên hệ
-- **Tác giả:** hctrung2k4  
+## Ghi chú
+
+- Contribution trên GitHub tính theo **ngày của commit**, không phải ngày push.
+- Version 1 (mô tả cũ): một lần chạy ~ một commit đơn; **v2** thêm nhiều commit mỗi lần chạy + phân phối lệch về số nhỏ.
+
+---
+
+## Liên hệ
+
+- **Tác giả:** hctrung2k4
 - **Email:** hctrung2k4@gmail.com

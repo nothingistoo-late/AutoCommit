@@ -25,11 +25,12 @@ class Program
 
             for (int i = 1; i <= commitCount; i++)
             {
-                string stamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(logFilePath, $"Commit {i}/{commitCount} at {stamp}\n");
+                // Định dạng ngày giờ theo mặc định hệ thống (giống bản cũ: $"{DateTime.Now}")
+                DateTime now = DateTime.Now;
+                File.AppendAllText(logFilePath, $"Commit {i}/{commitCount} at {now}\n");
 
                 RunGitCommand("git add .");
-                string message = $"Auto commit ({i}/{commitCount}) - {stamp}";
+                string message = $"Auto commit ({i}/{commitCount}) - {now}";
                 RunGitCommand($"git commit -m \"{message}\"");
                 Console.WriteLine($"  Đã commit {i}/{commitCount}.");
             }

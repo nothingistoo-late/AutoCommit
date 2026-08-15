@@ -22,16 +22,17 @@ class Program
         Console.WriteLine("    🚀 AUTO COMMIT - POLYGLOT KNOWLEDGE ENGINE  ");
         Console.WriteLine("=================================================");
 
-        // Parse CLI arguments
-        var cli = CliOptions.Parse(args);
-        if (cli.ShowHelp)
-        {
-            PrintHelp();
-            return 0;
-        }
-
+        CliOptions? cli = null;
         try
         {
+            // Parse CLI arguments
+            cli = CliOptions.Parse(args);
+            if (cli.ShowHelp)
+            {
+                PrintHelp();
+                return 0;
+            }
+
             string repoPath = ResolveRepositoryRoot(cli.CustomRepoPath);
             Console.WriteLine($"📂 Repository: {repoPath}");
             Directory.SetCurrentDirectory(repoPath);
@@ -149,7 +150,7 @@ class Program
             try
             {
                 var repoPath = Environment.CurrentDirectory;
-                var config = AppConfig.Load(repoPath, cli.CustomConfigPath);
+                var config = AppConfig.Load(repoPath, cli?.CustomConfigPath);
                 if (config.Telegram.Enabled)
                 {
                     _ = SendTelegramNotificationAsync(config, false, new List<string>(), new List<string> { $"❌ Lỗi: {ex.Message}" });
@@ -1136,28 +1137,43 @@ public class CliOptions
             {
                 opts.CustomConfigPath = args[++i];
             }
-            else if (arg.Equals("--fill", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (arg.Equals("--fill", StringComparison.OrdinalIgnoreCase))
             {
-                if (DateTime.TryParseExact(args[++i], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
-                {
-                    opts.FillDates.Add(dt);
-                }
+                if (i + 1 >= args.Length)
+                    throw new ArgumentException("Thiếu ngày cho --fill. Ví dụ: --fill 2026-08-20");
+
+                string dateStr = args[++i];
+                if (!DateTime.TryParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                    throw new ArgumentException($"Ngày không hợp lệ cho --fill: '{dateStr}'. Định dạng đúng: YYYY-MM-DD");
+
+                opts.FillDates.Add(dt);
             }
-            else if (arg.Equals("--fill-range", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            else if (arg.Equals("--fill-range", StringComparison.OrdinalIgnoreCase))
             {
+                if (i + 1 >= args.Length)
+                    throw new ArgumentException("Thiếu khoảng ngày cho --fill-range. Ví dụ: --fill-range 2026-08-15:2026-08-20");
+
                 string rangeStr = args[++i];
                 var parts = rangeStr.Split(':');
-                if (parts.Length == 2 &&
-                    DateTime.TryParseExact(parts[0].Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) &&
-                    DateTime.TryParseExact(parts[1].Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
+                if (parts.Length != 2 ||
+                    !DateTime.TryParseExact(parts[0].Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start) ||
+                    !DateTime.TryParseExact(parts[1].Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
                 {
-                    for (var d = start; d <= end; d = d.AddDays(1))
-                    {
-                        opts.FillDates.Add(d);
-                    }
+                    throw new ArgumentException(
+                        $"Khoảng ngày không hợp lệ cho --fill-range: '{rangeStr}'. Định dạng đúng: YYYY-MM-DD:YYYY-MM-DD");
                 }
+
+                if (end < start)
+                    throw new ArgumentException($"--fill-range: ngày kết thúc ({end:yyyy-MM-dd}) phải >= ngày bắt đầu ({start:yyyy-MM-dd}).");
+
+                for (var d = start; d <= end; d = d.AddDays(1))
+                    opts.FillDates.Add(d);
             }
-            else if (!arg.StartsWith("-") && opts.CustomRepoPath == null)
+            else if (arg.StartsWith("-", StringComparison.Ordinal))
+            {
+                throw new ArgumentException($"Tùy chọn không được hỗ trợ: '{arg}'. Dùng --help để xem danh sách.");
+            }
+            else if (opts.CustomRepoPath == null)
             {
                 opts.CustomRepoPath = arg;
             }

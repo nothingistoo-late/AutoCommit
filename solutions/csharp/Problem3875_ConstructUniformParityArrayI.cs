@@ -4,7 +4,7 @@ namespace AutoCommit.Solutions;
 /// LeetCode 3875: Construct Uniform Parity Array I
 /// Difficulty: Easy | Tags: Array, Math
 /// Link: https://leetcode.com/problems/construct-uniform-parity-array-i/
-/// Solved on: 2026-08-16 15:23:28
+/// Solved on: 2026-08-17 12:47:56
 /// </summary>
 public class Problem3875_ConstructUniformParityArrayI
 {

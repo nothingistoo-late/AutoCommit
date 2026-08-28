@@ -2,14 +2,14 @@
 
 <p align="center">
   <b>A smart, natural, and resilient Git automation tool built with .NET 8</b><br>
-  <i>Tự động hóa commit & push Git thông minh, tự nhiên, chống đứt chuỗi xanh và thông báo tức thì.</i>
+  <i>Tự động hóa commit & push Git thông minh, rải thời gian tự nhiên tức thì, chống đứt chuỗi xanh và thông báo Telegram.</i>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat&logo=dotnet&logoColor=white" alt=".NET 8" />
   <img src="https://img.shields.io/badge/Git-Automation-F05032?style=flat&logo=git&logoColor=white" alt="Git" />
+  <img src="https://img.shields.io/badge/Speed-Instant_Time_Scatter-success" alt="Instant Time-Scatter" />
   <img src="https://img.shields.io/badge/Telegram-Notifications-2CA5E0?style=flat&logo=telegram&logoColor=white" alt="Telegram" />
-  <img src="https://img.shields.io/badge/Status-Active-brightgreen" alt="Status" />
   <img src="https://img.shields.io/badge/License-MIT-blue" alt="License" />
 </p>
 
@@ -24,41 +24,41 @@
 # 🇻🇳 Tiếng Việt
 
 ## 📖 Giới thiệu
-**AutoCommit** là công cụ dòng lệnh (CLI) được viết bằng C# (.NET 8) giúp duy trì hoạt động commit và lịch sử đóng góp (GitHub contribution graph) một cách **tự nhiên**, **an toàn**, và **linh hoạt nhất**. 
+**AutoCommit** là công cụ dòng lệnh (CLI) được viết bằng C# (.NET 8) giúp duy trì hoạt động commit và lịch sử đóng góp (GitHub contribution graph) một cách **tự nhiên**, **an toàn**, và **siêu nhanh**.
 
-Công cụ giải quyết triệt để các vấn đề thường gặp của các bot auto commit truyền thống:
-* ❌ Tránh các commit vô nghĩa hoặc giống hệt nhau gây lộ bot.
-* ❌ Tránh tạo dồn dập hàng loạt commit trong cùng 1 giây.
-* ❌ Không lo mất chuỗi xanh (streak) khi quên bật máy hoặc máy gặp sự cố.
-* ❌ Khắc phục lỗi Task Scheduler tự nhận sai thông tin tài khoản Windows Domain.
+### ⚡ Điểm đột phá ở Phiên bản 3.1:
+* **Không cần ngồi chờ (Zero Wait)**: Toàn bộ quá trình commit và push chỉ mất **1 – 2 giây**.
+* **Rải mốc thời gian tự nhiên (Instant Time-Scattering)**: Các commit tự động mang các mốc thời gian rải rác từ sáng đến chiều (`09:15`, `11:40`, `15:30`), tạo lịch sử đóng góp như người thật làm việc cả ngày!
+* **Tránh lộ bot 100%**: Sử dụng WhatTheCommit API + Bộ sinh Conventional Commit chất lượng cao.
+* **Không sợ mất chuỗi (Streak Healer)**: Tự động phát hiện và bù ngày bị thiếu commit.
+* **Thông báo tức thì qua Telegram**: Gửi kết quả về điện thoại ngay sau khi push.
 
 ---
 
 ## 📜 Lịch sử phiên bản (Changelog)
 
-### 🌟 Phiên bản 3 (Hiện tại) - *Smart & Stealth Upgrade*
+### 🌟 Phiên bản 3.1 (Hiện tại) - *Instant Time-Scattering & Stealth Upgrade*
+* **⚡ Động cơ Rải mốc thời gian tức thì (Instant Time-Scattering)**: Tự động phân bổ các mốc commit ngẫu nhiên tăng dần trong khung giờ làm việc (`08:30` -> `Hiện tại`) mà không cần `Task.Delay` ngồi đợi, hoàn thành mọi thứ trong 1-2 giây.
 * **🌐 Tích hợp API WhatTheCommit**: Lấy commit message hài hước, ngẫu nhiên từ `whatthecommit.com`.
-* **🛡️ Bộ sinh Conventional Commits Offline**: Khi mất mạng, tự động kích hoạt thuật toán ghép từ thông minh sinh ra hơn **3.000+ commit message** chuẩn chuyên nghiệp (`feat(api): optimize memory allocation...`), đảm bảo app không bao giờ bị crash.
+* **🛡️ Bộ sinh Conventional Commits Offline**: Khi mất mạng, tự động chuyển sang bộ ghép từ chuẩn sinh ra hơn **3.000+ commit message** (`feat(api): optimize memory allocation...`), đảm bảo app không bao giờ crash.
 * **⚙️ Cấu hình `config.json`**: Tách toàn bộ thiết lập ra ngoài file JSON, không cần compile lại source code.
 * **🛡️ Cứu chuỗi kép (Dual Streak Saver)**:
   * **Tự động (Auto-Heal)**: Quét `git log`, tự phát hiện ngày hôm qua/quá khứ gần bị thiếu commit và tự động tạo commit bù.
   * **Thủ công (Manual Backdate)**: Hỗ trợ lệnh CLI bù ngày bất kỳ (`--fill`) hoặc cả khoảng ngày (`--fill-range`).
-* **⏳ Độ trễ tự nhiên (Smart Jitter Delay)**: Tự động nghỉ ngẫu nhiên từ 15s – 90s giữa các commit.
-* **📱 Thông báo tức thì qua Telegram**: Gửi kết quả (số commit, thời gian, commit mới nhất, trạng thái push) về điện thoại.
-* **🔒 Khắc phục lỗi Task Scheduler**: Gắn cứng thông tin tác giả vào Git environment của process.
+* **📱 Thông báo Telegram**: Bắn báo cáo tổng kết kèm trạng thái push về điện thoại qua Telegram Bot.
+* **🔒 Khắc phục triệt để Task Scheduler**: Gắn cứng thông tin tác giả vào Git environment của process.
 
 ### 🔹 Phiên bản 2 - *Multi-Commit & Skewed Distribution*
 * **Nhiều commit mỗi lần chạy**: Cho phép random số lượng commit trong khoảng `[min, max]`.
-* **Phân phối lệch về số nhỏ (Skewed Low)**: Lấy giá trị nhỏ nhất của 2 lần random để đa số chỉ tạo 1–3 commit/ngày, hiếm khi tạo quá nhiều.
+* **Phân phối lệch về số nhỏ (Skewed Low)**: Lấy giá trị nhỏ nhất của 2 lần random để đa số chỉ tạo 1–3 commit/ngày.
 * **Tự động dò tìm gốc Git (`.git`)**: Đi ngược từ thư mục hiện tại lên cây thư mục cha cho đến khi tìm thấy repository.
-* **Ghi log**: Ghi nhận lịch sử commit vào file `autocommit_log.txt`.
 
 ### 🔹 Phiên bản 1 - *Khởi tạo ban đầu*
 * Chạy commit và push đơn lẻ mỗi lần thực thi theo lịch cơ bản.
 
 ---
 
-## ⚙️ Giải thích chi tiết file `config.json`
+## ⚙️ Cấu hình `config.json`
 
 File `config.json` nằm tại thư mục gốc của repository:
 
@@ -72,10 +72,6 @@ File `config.json` nằm tại thư mục gốc của repository:
   "commitsPerRun": {
     "min": 1,
     "max": 5
-  },
-  "delaySeconds": {
-    "min": 15,
-    "max": 90
   },
   "whatTheCommit": {
     "enabled": true,
@@ -98,12 +94,10 @@ File `config.json` nằm tại thư mục gốc của repository:
 | Tham số | Kiểu dữ liệu | Ý nghĩa |
 | :--- | :--- | :--- |
 | `gitUser.name` | `string` | Tên tác giả hiển thị trên Git & GitHub. |
-| `gitUser.email` | `string` | Email liên kết với tài khoản GitHub (quyết định Avatar & Contribution graph). |
-| `branch` | `string` | Tên nhánh Git để đẩy code lên (ví dụ: `master` hoặc `main`). |
+| `gitUser.email` | `string` | Email liên kết với GitHub (quyết định Avatar & Contribution graph). |
+| `branch` | `string` | Tên nhánh Git để đẩy code lên (`master` hoặc `main`). |
 | `commitsPerRun.min` | `int` | Số lượng commit tối thiểu mỗi lần chạy. |
 | `commitsPerRun.max` | `int` | Số lượng commit tối đa mỗi lần chạy. |
-| `delaySeconds.min` | `int` | Số giây nghỉ tối thiểu giữa 2 lần commit liên tiếp. |
-| `delaySeconds.max` | `int` | Số giây nghỉ tối đa giữa 2 lần commit liên tiếp. |
 | `whatTheCommit.enabled` | `bool` | Bật/tắt việc gọi API WhatTheCommit để lấy message. |
 | `whatTheCommit.apiUrl` | `string` | Địa chỉ URL của API WhatTheCommit. |
 | `whatTheCommit.timeoutSeconds` | `int` | Thời gian chờ tối đa khi gọi API trước khi chuyển sang chế độ Offline. |
@@ -127,22 +121,19 @@ File `config.json` nằm tại thư mục gốc của repository:
 ## 💻 Danh sách lệnh CLI & Ví dụ
 
 ```powershell
-# 1. Chạy bình thường theo config.json (đầy đủ delay và auto-heal)
+# 1. Chạy tự động (rải mốc thời gian tức thì theo config.json)
 dotnet run --project AutoCommit\AutoCommit.csproj
 
-# 2. Chạy nhanh (bỏ qua độ trễ giữa các commit - dùng khi test)
-dotnet run --project AutoCommit\AutoCommit.csproj -- --no-delay
-
-# 3. Bù commit cho 1 ngày cụ thể trong quá khứ (ví dụ: 20/08/2026 với 3 commit)
+# 2. Bù commit cho 1 ngày cụ thể trong quá khứ (ví dụ: 20/08/2026 với 3 commit rải rác)
 dotnet run --project AutoCommit\AutoCommit.csproj -- --fill 2026-08-20 --count 3
 
-# 4. Bù commit cho cả một dải ngày trong quá khứ
-dotnet run --project AutoCommit\AutoCommit.csproj -- --fill-range 2026-08-10:2026-08-20 --no-delay
+# 3. Bù commit cho cả một dải ngày trong quá khứ
+dotnet run --project AutoCommit\AutoCommit.csproj -- --fill-range 2026-08-10:2026-08-20
 
-# 5. Chỉ commit local, không push lên GitHub
+# 4. Chỉ commit local, không push lên GitHub
 dotnet run --project AutoCommit\AutoCommit.csproj -- --no-push
 
-# 6. Xem hướng dẫn sử dụng dòng lệnh
+# 5. Xem hướng dẫn sử dụng dòng lệnh
 dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 ```
 
@@ -151,8 +142,8 @@ dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 ## ⏰ Cài đặt chạy tự động bằng Windows Task Scheduler
 
 1. Nhấn tổ hợp phím `Win + R`, nhập `taskschd.msc` và nhấn Enter.
-2. Nhấn **Create Task...** ở cột bên phải:
-   * **General**: Đặt tên `AutoCommit Daily`, tích chọn *Run whether user is logged on or not* (hoặc *Run only when user is logged on*).
+2. Nhấn **Create Task...**:
+   * **General**: Đặt tên `AutoCommit Daily`, tích chọn *Run whether user is logged on or not*.
    * **Triggers**: Chọn **New...** -> **Daily** -> Thiết lập giờ chạy (ví dụ `09:15:00 AM`).
    * **Actions**: Chọn **New...** -> **Start a program**:
      * **Program/script**: `D:\TrungHC\AutoCommit\AutoCommit\bin\Release\net8.0\AutoCommit.exe`
@@ -168,35 +159,33 @@ dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 # 🇬🇧 English
 
 ## 📖 Overview
-**AutoCommit** is a robust and intelligent Git automation CLI tool developed in C# (.NET 8). It is designed to maintain a consistent, healthy, and **natural-looking** GitHub contribution graph while eliminating the common pitfalls of naive auto-commit scripts.
+**AutoCommit** is an advanced Git automation CLI tool written in C# (.NET 8). It keeps your GitHub contribution graph alive and **realistic** by using an **Instant Time-Scattering Engine** — achieving natural daily activity across working hours in just 1-2 seconds without freezing your computer.
 
-### Why AutoCommit v3?
-* 🚀 **Human-like Commits**: Integrates with WhatTheCommit API and smart Conventional Commit generators.
-* ⏳ **Smart Jitter Delay**: Emulates realistic developer workflow by pausing randomly between commits instead of bursting commits within the same second.
-* 🛡️ **Streak Recovery**: Automatically detects and backdates missed days to protect your streaks.
-* 📱 **Instant Telegram Alerts**: Get real-time status updates right on your smartphone.
-* 🔒 **Task Scheduler Safe**: Eliminates Windows Domain / system account author overriding issues.
+### ⚡ Highlights in Version 3.1:
+* **Instant Execution (Zero Wait)**: Commits and pushes in under 2 seconds.
+* **Instant Time-Scattering Engine**: Commits carry realistic, ascending timestamps scattered across the working day (`09:15`, `11:40`, `15:30`).
+* **WhatTheCommit & Conventional Commits**: Rich, humorous, and natural commit messages.
+* **Dual Streak Protector**: Auto-heals missed days and supports manual backdating via CLI.
+* **Instant Telegram Alerts**: Real-time push notifications sent straight to your phone.
 
 ---
 
 ## 📜 Version History (Changelog)
 
-### 🌟 Version 3 (Current) - *Smart & Stealth Upgrade*
-* **🌐 WhatTheCommit API Integration**: Fetches humorous, realistic commit messages dynamically from `whatthecommit.com`.
-* **🛡️ Offline Conventional Commits Generator**: Features a zero-dependency dynamic builder generating over **3,000+** standardized messages (e.g. `feat(api): optimize memory allocation...`) when offline.
-* **⚙️ JSON Configuration (`config.json`)**: Full externalized configuration without needing to rebuild.
+### 🌟 Version 3.1 (Current) - *Instant Time-Scattering & Stealth Upgrade*
+* **⚡ Instant Time-Scattering Engine**: Replaces long sleep delays by dynamically calculating sorted, realistic timestamps throughout working hours, finishing everything in seconds.
+* **🌐 WhatTheCommit API Integration**: Fetches dynamic commit messages from `whatthecommit.com`.
+* **🛡️ Offline Conventional Commits Generator**: Features a zero-dependency generator creating **3,000+** realistic commit messages when offline.
+* **⚙️ External Configuration (`config.json`)**: Easily configure authors, branches, and features without rebuilding.
 * **🛡️ Dual Streak Saver**:
-  * **Auto-Heal Mode**: Scans recent `git log` history to automatically backdate missed days.
-  * **Manual Backdate Mode**: CLI flags (`--fill`, `--fill-range`) to backdate specific dates or ranges in the past.
-* **⏳ Smart Jitter Delay**: Configurable random delay (default: 15s–90s) between commits.
-* **📱 Telegram Notifications**: Real-time push notifications with Markdown summary reports.
-* **🔒 Task Scheduler Isolation**: Explicitly injects Git author/committer credentials per execution.
+  * **Auto-Heal Mode**: Scans past history and backdates missed days.
+  * **Manual Backdate Mode**: CLI flags (`--fill`, `--fill-range`) for targeted date ranges.
+* **📱 Telegram Alerts**: Instant push notifications upon task completion or error.
 
 ### 🔹 Version 2 - *Multi-Commit & Skewed Distribution*
 * **Dynamic Commit Counts**: Configurable range of commits per execution (`[min, max]`).
-* **Skewed-Low Distribution**: Random distribution favored towards smaller commit numbers (1-3 commits) to look realistic.
-* **Auto Git Discovery**: Recursively traverses upwards to locate the nearest `.git` directory.
-* **File Logging**: Appends commit timestamp and info into `autocommit_log.txt`.
+* **Skewed-Low Distribution**: Favors fewer commits per run for realism.
+* **Auto Git Discovery**: Automatically traverses parent directories to find `.git`.
 
 ### 🔹 Version 1 - *Initial Release*
 * Basic scheduled single commit and push to remote.
@@ -204,8 +193,6 @@ dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 ---
 
 ## ⚙️ `config.json` Specification
-
-Located at the repository root:
 
 ```json
 {
@@ -217,10 +204,6 @@ Located at the repository root:
   "commitsPerRun": {
     "min": 1,
     "max": 5
-  },
-  "delaySeconds": {
-    "min": 15,
-    "max": 90
   },
   "whatTheCommit": {
     "enabled": true,
@@ -240,69 +223,26 @@ Located at the repository root:
 }
 ```
 
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| `gitUser.name` | `string` | Author name displayed on Git commits & GitHub profile. |
-| `gitUser.email` | `string` | Email associated with GitHub account (maps avatar and contributions). |
-| `branch` | `string` | Target Git branch to push (e.g. `master` or `main`). |
-| `commitsPerRun.min` | `int` | Minimum number of commits per execution. |
-| `commitsPerRun.max` | `int` | Maximum number of commits per execution. |
-| `delaySeconds.min` | `int` | Minimum delay in seconds between consecutive commits. |
-| `delaySeconds.max` | `int` | Maximum delay in seconds between consecutive commits. |
-| `whatTheCommit.enabled` | `bool` | Enables/disables fetching from WhatTheCommit API. |
-| `whatTheCommit.apiUrl` | `string` | API endpoint for WhatTheCommit. |
-| `whatTheCommit.timeoutSeconds` | `int` | Network timeout before falling back to offline generator. |
-| `autoStreakRecovery.enabled` | `bool` | Automatically checks and fills missed days in recent history. |
-| `autoStreakRecovery.checkPastDays`| `int` | Number of past days to check for missing activity. |
-| `autoStreakRecovery.commitsPerMissedDay`| `int` | Number of commits created for each missed day. |
-| `telegram.enabled` | `bool` | Enables/disables Telegram notification delivery. |
-| `telegram.botToken` | `string` | Bot token provided by `@BotFather`. |
-| `telegram.chatId` | `string` | Target user/group chat ID. |
-
----
-
-## 📱 Telegram Bot Setup (3 Steps)
-
-1. **Create Bot**: Open Telegram, search for **`@BotFather`**, send `/newbot`, name your bot, and obtain your `botToken`.
-2. **Find Chat ID**: Open **`@userinfobot`**, press **Start** to get your numeric `Id`. Send any text message to your newly created bot to initialize the conversation.
-3. **Configure**: Enter `botToken` and `chatId` in `config.json` and set `"enabled": true`.
-
 ---
 
 ## 💻 CLI Commands & Examples
 
 ```powershell
-# 1. Normal execution (with natural delay and auto streak healer)
+# 1. Normal run (with instant time-scattering and auto-heal)
 dotnet run --project AutoCommit\AutoCommit.csproj
 
-# 2. Fast execution (bypasses delays, useful for testing)
-dotnet run --project AutoCommit\AutoCommit.csproj -- --no-delay
-
-# 3. Backdate commits for a specific date in the past
+# 2. Backdate commits for a specific date in the past
 dotnet run --project AutoCommit\AutoCommit.csproj -- --fill 2026-08-20 --count 3
 
-# 4. Backdate commits across a date range
-dotnet run --project AutoCommit\AutoCommit.csproj -- --fill-range 2026-08-10:2026-08-20 --no-delay
+# 3. Backdate commits across a date range
+dotnet run --project AutoCommit\AutoCommit.csproj -- --fill-range 2026-08-10:2026-08-20
 
-# 5. Local commits only (skip git push)
+# 4. Local commits only (skip git push)
 dotnet run --project AutoCommit\AutoCommit.csproj -- --no-push
 
-# 6. Show CLI Help
+# 5. Show CLI Help
 dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 ```
-
----
-
-## ⏰ Windows Task Scheduler Automation
-
-1. Press `Win + R`, type `taskschd.msc`, and press Enter.
-2. Click **Create Task...**:
-   * **General**: Name the task (e.g. `AutoCommit GitHub Daily`).
-   * **Triggers**: **New...** -> **Daily** -> Set execution time (e.g. `09:15 AM`).
-   * **Actions**: **New...** -> **Start a program**:
-     * **Program/script**: `D:\TrungHC\AutoCommit\AutoCommit\bin\Release\net8.0\AutoCommit.exe`
-     * **Start in (CRITICAL)**: `D:\TrungHC\AutoCommit`
-3. Click **OK** to save.
 
 ---
 

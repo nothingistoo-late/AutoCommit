@@ -6,11 +6,12 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 class Program
 {
-    static readonly HttpClient httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+    static readonly HttpClient httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
 
     static async Task<int> Main(string[] args)
     {
@@ -34,6 +35,16 @@ class Program
             string repoPath = ResolveRepositoryRoot(cli.CustomRepoPath);
             Console.WriteLine($"📂 Repository: {repoPath}");
             Directory.SetCurrentDirectory(repoPath);
+
+            // Handle Task Scheduler CLI Installation / Uninstallation
+            if (cli.InstallTask)
+            {
+                return TaskSchedulerService.InstallTask(repoPath, cli.TaskTime, cli.TaskName);
+            }
+            if (cli.UninstallTask)
+            {
+                return TaskSchedulerService.UninstallTask(cli.TaskName);
+            }
 
             // Load configuration
             var config = AppConfig.Load(repoPath, cli.CustomConfigPath);
@@ -69,7 +80,7 @@ class Program
 
                 // Normal commit execution for today with Monotonic Time-Scattering
                 int commitCount = cli.CustomCommitCount ?? RandomSkewedLow(config.CommitsPerRun.Min, config.CommitsPerRun.Max);
-                Console.WriteLine($"\n🌱 Sẽ tạo {commitCount} commit rải rác tăng dần cho hôm nay ({DateTime.Now:yyyy-MM-dd})...");
+                Console.WriteLine($"\n🌱 Sẽ tạo {commitCount} commit chất lượng cho hôm nay ({DateTime.Now:yyyy-MM-dd})...");
 
                 string logFilePath = Path.Combine(repoPath, "autocommit_log.txt");
                 var timestamps = GenerateMonotonicTimestamps(lastCommitTime, DateTime.Today, commitCount, isToday: true);
@@ -77,7 +88,9 @@ class Program
                 for (int i = 0; i < commitCount; i++)
                 {
                     DateTime commitTime = timestamps[i];
-                    string commitMsg = await GetCommitMessageAsync(config);
+                    
+                    // Fetch real knowledge/snippet & commit message
+                    var (commitMsg, noteFileUpdated) = await KnowledgeService.RecordKnowledgeAndGetMessageAsync(repoPath, config, commitTime, i + 1, commitCount);
                     
                     File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] Commit {i + 1}/{commitCount}: {commitMsg}\n");
 
@@ -85,7 +98,8 @@ class Program
                     RunGit(repoPath, $"commit -m \"{EscapeQuote(commitMsg)}\"", config, customDate: commitTime);
                     
                     createdCommitMessages.Add(commitMsg);
-                    Console.WriteLine($"  [{i + 1}/{commitCount}] ✅ Đã commit ({commitTime:HH:mm:ss}): \"{commitMsg}\"");
+                    string targetInfo = !string.IsNullOrEmpty(noteFileUpdated) ? $" [Ghi vào: {noteFileUpdated}]" : "";
+                    Console.WriteLine($"  [{i + 1}/{commitCount}] ✅ Đã commit ({commitTime:HH:mm:ss}){targetInfo}: \"{commitMsg}\"");
                 }
 
                 summaryLogs.Add($"Hôm nay ({DateTime.Now:yyyy-MM-dd}): {commitCount} commits");
@@ -117,7 +131,7 @@ class Program
                 Console.WriteLine("\nℹ️ Cờ --no-push được bật: Bỏ qua bước đẩy lên remote.");
             }
 
-            Console.WriteLine("\n🎉 Hoàn thành xuất sắc toàn bộ quy trình AutoCommit (Thời gian luôn xuôi chiều tuyệt đối)!");
+            Console.WriteLine("\n🎉 Hoàn thành xuất sắc toàn bộ quy trình AutoCommit!");
             return 0;
         }
         catch (Exception ex)
@@ -143,9 +157,6 @@ class Program
     }
 
     #region Monotonic Time-Scattering Engine
-    /// <summary>
-    /// Lấy mốc thời gian của commit gần nhất trong repo Git.
-    /// </summary>
     static DateTime? GetLatestCommitTime(string repoPath, AppConfig config)
     {
         var res = RunGit(repoPath, "log -1 --date=iso-strict --pretty=format:\"%cd\"", config);
@@ -159,20 +170,13 @@ class Program
         return null;
     }
 
-    /// <summary>
-    /// Sinh ra danh sách mốc thời gian LUÔN TĂNG DẦN và NẰM SAU commit mới nhất.
-    /// Đảm bảo cây lịch sử Git luôn xuôi chiều 100%, không bao giờ bị nhảy cóc về quá khứ!
-    /// </summary>
     static List<DateTime> GenerateMonotonicTimestamps(DateTime? lastCommitTime, DateTime date, int count, bool isToday)
     {
         count = Math.Max(1, count);
         var timestamps = new List<DateTime>();
 
-        // Giờ bắt đầu mặc định trong ngày: 08:30
         DateTime startWindow = new DateTime(date.Year, date.Month, date.Day, 8, 30, 0);
 
-        // NẾU commit gần nhất diễn ra trong CÙNG NGÀY ĐANG XÉT:
-        // Cửa sổ thời gian bắt buộc phải bắt đầu SAU commit gần nhất (cách 1 - 5 phút).
         if (lastCommitTime.HasValue && lastCommitTime.Value.Date == date.Date)
         {
             if (lastCommitTime.Value >= startWindow)
@@ -196,7 +200,6 @@ class Program
         }
         else
         {
-            // Quá khứ: rải đều tới cuối giờ chiều (18:30)
             endWindow = new DateTime(date.Year, date.Month, date.Day, 18, 30, 0);
             if (endWindow <= startWindow)
             {
@@ -206,7 +209,6 @@ class Program
 
         double totalSeconds = (endWindow - startWindow).TotalSeconds;
 
-        // Nếu khoảng cách quá hẹp (ví dụ chạy liên tiếp nhiều lần sát giờ hiện tại):
         if (totalSeconds < count * 60)
         {
             DateTime current = startWindow;
@@ -218,7 +220,6 @@ class Program
             return timestamps;
         }
 
-        // Bốc ngẫu nhiên 'count' điểm mốc giây rồi sắp xếp tăng dần
         var offsets = new List<int>();
         for (int i = 0; i < count; i++)
         {
@@ -226,7 +227,6 @@ class Program
         }
         offsets.Sort();
 
-        // Đảm bảo mỗi commit cách nhau ít nhất 60-180 giây
         for (int i = 1; i < offsets.Count; i++)
         {
             if (offsets[i] <= offsets[i - 1])
@@ -261,7 +261,7 @@ class Program
             for (int i = 0; i < commitsPerDay; i++)
             {
                 DateTime commitTime = timestamps[i];
-                string commitMsg = await GetCommitMessageAsync(config);
+                var (commitMsg, noteFile) = await KnowledgeService.RecordKnowledgeAndGetMessageAsync(repoPath, config, commitTime, i + 1, commitsPerDay);
                 File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] [Backdate] Commit {i + 1}/{commitsPerDay}: {commitMsg}\n");
 
                 RunGit(repoPath, "add .", config);
@@ -282,7 +282,6 @@ class Program
         int pastDays = Math.Max(1, config.AutoStreakRecovery.CheckPastDays);
         DateTime today = DateTime.Today;
 
-        // Query git log for dates with commits in the last N days
         var gitLogResult = RunGit(repoPath, $"log --since=\"{pastDays + 2} days ago\" --date=short --pretty=format:\"%cd\"", config);
         var existingDates = new HashSet<string>(
             gitLogResult.StdOut
@@ -317,7 +316,7 @@ class Program
                 for (int i = 0; i < commitsPerDay; i++)
                 {
                     DateTime commitTime = timestamps[i];
-                    string commitMsg = await GetCommitMessageAsync(config);
+                    var (commitMsg, noteFile) = await KnowledgeService.RecordKnowledgeAndGetMessageAsync(repoPath, config, commitTime, i + 1, commitsPerDay);
                     File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] [AutoHeal] Commit {i + 1}/{commitsPerDay}: {commitMsg}\n");
 
                     RunGit(repoPath, "add .", config);
@@ -333,58 +332,270 @@ class Program
     }
     #endregion
 
-    #region Commit Message Service
-    static async Task<string> GetCommitMessageAsync(AppConfig config)
+    #region Knowledge & Content Service (Online & Fallback)
+    static class KnowledgeService
     {
-        if (config.WhatTheCommit.Enabled && !string.IsNullOrWhiteSpace(config.WhatTheCommit.ApiUrl))
+        public static async Task<(string CommitMessage, string? NoteFileUpdated)> RecordKnowledgeAndGetMessageAsync(
+            string repoPath, AppConfig config, DateTime commitTime, int commitIndex, int totalCommits)
+        {
+            string notesDir = Path.Combine(repoPath, config.KnowledgeSync.NotesDirectory);
+            Directory.CreateDirectory(notesDir);
+
+            // If LeetCode / Online Knowledge sync is enabled
+            if (config.KnowledgeSync.Enabled)
+            {
+                // Alternately fetch LeetCode Daily or Tech Tips
+                if (commitIndex % 2 == 1)
+                {
+                    var leetCodeResult = await TryFetchLeetCodeDailyAsync();
+                    if (leetCodeResult != null)
+                    {
+                        string leetCodeFilePath = Path.Combine(notesDir, "leetcode_daily.md");
+                        string content = $"\n\n### 🧩 LeetCode {leetCodeResult.QuestionFrontendId}: {leetCodeResult.QuestionTitle} ({leetCodeResult.Difficulty})\n" +
+                                         $"* **Date**: `{commitTime:yyyy-MM-dd HH:mm:ss}`\n" +
+                                         $"* **Tags**: `{string.Join(", ", leetCodeResult.Tags)}`\n" +
+                                         $"* **Link**: [View on LeetCode]({leetCodeResult.QuestionLink})\n\n" +
+                                         $"> **Summary**: Added problem analysis and solution notes for {leetCodeResult.QuestionTitle}.\n";
+
+                        File.AppendAllText(leetCodeFilePath, content);
+                        string msg = $"docs(leetcode): solve '{leetCodeResult.QuestionTitle}' ({leetCodeResult.Difficulty})";
+                        return (msg, Path.Combine(config.KnowledgeSync.NotesDirectory, "leetcode_daily.md"));
+                    }
+                }
+                else
+                {
+                    var tip = GetCuratedTechTip();
+                    string tipFilePath = Path.Combine(notesDir, "csharp_tips.md");
+                    string content = $"\n\n### 💡 {tip.Title}\n" +
+                                     $"* **Category**: `{tip.Category}` | **Timestamp**: `{commitTime:yyyy-MM-dd HH:mm:ss}`\n\n" +
+                                     $"{tip.MarkdownContent}\n";
+
+                    File.AppendAllText(tipFilePath, content);
+                    string msg = $"docs({tip.Category}): {tip.CommitSummary}";
+                    return (msg, Path.Combine(config.KnowledgeSync.NotesDirectory, "csharp_tips.md"));
+                }
+            }
+
+            // Fallback to WhatTheCommit API or Conventional Commits
+            string fallbackMsg = await GetWhatTheCommitOrConventionalAsync(config);
+            return (fallbackMsg, null);
+        }
+
+        static async Task<LeetCodeProblem?> TryFetchLeetCodeDailyAsync()
         {
             try
             {
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(config.WhatTheCommit.TimeoutSeconds));
-                var response = await httpClient.GetStringAsync(config.WhatTheCommit.ApiUrl, cts.Token);
-                string cleanMsg = response.Trim().Replace("\r", "").Replace("\n", " ");
-                if (!string.IsNullOrWhiteSpace(cleanMsg) && cleanMsg.Length < 150)
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                string url = "https://alfa-leetcode-api.onrender.com/daily";
+                var res = await httpClient.GetStringAsync(url, cts.Token);
+                using var doc = JsonDocument.Parse(res);
+                var root = doc.RootElement;
+
+                var problem = new LeetCodeProblem
                 {
-                    return cleanMsg;
+                    QuestionFrontendId = root.TryGetProperty("questionFrontendId", out var qId) ? qId.GetString() ?? "" : "",
+                    QuestionTitle = root.TryGetProperty("questionTitle", out var qTitle) ? qTitle.GetString() ?? "" : "",
+                    Difficulty = root.TryGetProperty("difficulty", out var diff) ? diff.GetString() ?? "Medium" : "Medium",
+                    QuestionLink = root.TryGetProperty("questionLink", out var link) ? link.GetString() ?? "https://leetcode.com" : "https://leetcode.com"
+                };
+
+                if (root.TryGetProperty("topicTags", out var tagsElem) && tagsElem.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var tag in tagsElem.EnumerateArray())
+                    {
+                        if (tag.TryGetProperty("name", out var tagName))
+                        {
+                            problem.Tags.Add(tagName.GetString() ?? "");
+                        }
+                    }
                 }
+
+                if (!string.IsNullOrWhiteSpace(problem.QuestionTitle))
+                    return problem;
             }
-            catch
+            catch { }
+
+            return null;
+        }
+
+        static async Task<string> GetWhatTheCommitOrConventionalAsync(AppConfig config)
+        {
+            if (config.WhatTheCommit.Enabled && !string.IsNullOrWhiteSpace(config.WhatTheCommit.ApiUrl))
             {
-                // Fallback to offline generator smoothly
+                try
+                {
+                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(config.WhatTheCommit.TimeoutSeconds));
+                    var response = await httpClient.GetStringAsync(config.WhatTheCommit.ApiUrl, cts.Token);
+                    string cleanMsg = response.Trim().Replace("\r", "").Replace("\n", " ");
+                    if (!string.IsNullOrWhiteSpace(cleanMsg) && cleanMsg.Length < 150)
+                    {
+                        return cleanMsg;
+                    }
+                }
+                catch { }
+            }
+
+            return GenerateDynamicConventionalCommit();
+        }
+
+        static string GenerateDynamicConventionalCommit()
+        {
+            string[] types = { "feat", "fix", "docs", "refactor", "perf", "chore", "test", "style", "build", "ci" };
+            string[] scopes = { "core", "api", "auth", "utils", "config", "cache", "logger", "parser", "worker", "db", "network", "storage", "scheduler" };
+            string[] actions =
+            {
+                "optimize memory allocation in batch worker",
+                "improve error handling for timeout requests",
+                "clean up redundant variables and imports",
+                "update documentation and code examples",
+                "enhance response parsing and validation",
+                "refactor helper methods for clarity",
+                "add edge-case unit test coverage",
+                "fine-tune caching layer invalidation",
+                "update project configuration and dependencies",
+                "resolve minor race condition in worker loop",
+                "improve logging format and verbosity",
+                "streamline data processing pipeline",
+                "standardize exception handling across modules",
+                "optimize string formatting and allocations",
+                "adjust retry policy and exponential backoff"
+            };
+
+            var type = types[Random.Shared.Next(types.Length)];
+            var scope = scopes[Random.Shared.Next(scopes.Length)];
+            var action = actions[Random.Shared.Next(actions.Length)];
+
+            return $"{type}({scope}): {action}";
+        }
+
+        static TechTip GetCuratedTechTip()
+        {
+            var tips = new[]
+            {
+                new TechTip("Use ReadOnlySpan<T> for High-Performance String Parsing", "perf", "add Span<T> string parsing benchmark",
+                    "```csharp\nReadOnlySpan<char> span = text.AsSpan(0, 10);\n// Avoids heap allocation when slicing strings.\n```"),
+                new TechTip("Pattern Matching with Switch Expressions", "csharp", "add switch pattern matching examples",
+                    "```csharp\npublic static string Classify(int val) => val switch {\n    > 0 => \"Positive\",\n    < 0 => \"Negative\",\n    _ => \"Zero\"\n};\n```"),
+                new TechTip("Leverage ValueTask<T> to Avoid Async Allocations", "async", "optimize async methods using ValueTask",
+                    "```csharp\npublic ValueTask<int> GetCachedCountAsync() =>\n    _cached.HasValue ? new ValueTask<int>(_cached.Value) : new ValueTask<int>(FetchAsync());\n```"),
+                new TechTip("Primary Constructors in C# 12 / .NET 8", "csharp", "refactor service classes with primary constructors",
+                    "```csharp\npublic class UserService(IUserRepository repo, ILogger<UserService> logger) {\n    // Injected fields available in class body\n}\n```"),
+                new TechTip("Using FrozenDictionary for Read-Heavy Lookups", "collections", "adopt FrozenDictionary for immutable lookups",
+                    "```csharp\nvar lookup = sourceDict.ToFrozenDictionary();\n// Optimized for zero-overhead reads.\n```")
+            };
+
+            return tips[Random.Shared.Next(tips.Length)];
+        }
+    }
+
+    class LeetCodeProblem
+    {
+        public string QuestionFrontendId { get; set; } = "";
+        public string QuestionTitle { get; set; } = "";
+        public string Difficulty { get; set; } = "Medium";
+        public string QuestionLink { get; set; } = "";
+        public List<string> Tags { get; set; } = new List<string>();
+    }
+
+    record TechTip(string Title, string Category, string CommitSummary, string MarkdownContent);
+    #endregion
+
+    #region Task Scheduler Service (CLI 1-Click Installer)
+    static class TaskSchedulerService
+    {
+        public static int InstallTask(string repoPath, string time, string taskName)
+        {
+            Console.WriteLine($"\n⚙️ Đang đăng ký Windows Task Scheduler: '{taskName}'...");
+
+            // Find executable path
+            string exePath = Path.Combine(AppContext.BaseDirectory, "AutoCommit.exe");
+            if (!File.Exists(exePath))
+            {
+                exePath = Process.GetCurrentProcess().MainModule?.FileName ?? Path.Combine(repoPath, "AutoCommit", "bin", "Release", "net8.0", "AutoCommit.exe");
+            }
+
+            string psScript = $@"
+$taskName = '{taskName}'
+$exePath = '{exePath}'
+$workingDir = '{repoPath}'
+$time = '{time}'
+
+$Principal = New-ScheduledTaskPrincipal -UserId ""$env:USERDOMAIN\$env:USERNAME"" -LogonType S4U -RunLevel Highest
+$Action = New-ScheduledTaskAction -Execute $exePath -WorkingDirectory $workingDir
+$Trigger = New-ScheduledTaskTrigger -Daily -At $time
+$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+
+Register-ScheduledTask -TaskName $taskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Force | Out-Null
+Write-Host ""SUCCESS""
+";
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{psScript.Replace("\"", "\\\"")}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null)
+            {
+                Console.WriteLine("❌ Không thể khởi chạy PowerShell.");
+                return 1;
+            }
+
+            string stdout = proc.StandardOutput.ReadToEnd();
+            string stderr = proc.StandardError.ReadToEnd();
+            proc.WaitForExit();
+
+            if (stdout.Contains("SUCCESS"))
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"✅ Đã đăng ký thành công Task Scheduler '{taskName}'!");
+                Console.WriteLine($"   ⏰ Thời gian chạy  : Hàng ngày lúc {time}");
+                Console.WriteLine($"   🛡️ Quyền thực thi   : Highest (Run as Administrator)");
+                Console.WriteLine($"   👤 Logon Type       : S4U (Chạy dù user có login hay không)");
+                Console.WriteLine($"   📂 Thư mục gốc      : {repoPath}");
+                Console.WriteLine($"   🔋 Chế độ Pin       : Cho phép chạy khi dùng pin / Tự bù nếu lỡ giờ");
+                Console.ResetColor();
+                return 0;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"⚠️ Đăng ký thất bại hoặc cần quyền Administrator:");
+                Console.WriteLine(stderr);
+                Console.WriteLine("\n💡 Gợi ý: Hãy mở Windows Terminal / PowerShell với quyền 'Run as Administrator' rồi chạy lại lệnh này.");
+                Console.ResetColor();
+                return 1;
             }
         }
 
-        return GenerateDynamicConventionalCommit();
-    }
-
-    static string GenerateDynamicConventionalCommit()
-    {
-        string[] types = { "feat", "fix", "docs", "refactor", "perf", "chore", "test", "style", "build", "ci" };
-        string[] scopes = { "core", "api", "auth", "utils", "config", "cache", "logger", "parser", "worker", "db", "network", "storage", "scheduler" };
-        string[] actions =
+        public static int UninstallTask(string taskName)
         {
-            "optimize memory allocation in batch worker",
-            "improve error handling for timeout requests",
-            "clean up redundant variables and imports",
-            "update documentation and code examples",
-            "enhance response parsing and validation",
-            "refactor helper methods for clarity",
-            "add edge-case unit test coverage",
-            "fine-tune caching layer invalidation",
-            "update project configuration and dependencies",
-            "resolve minor race condition in worker loop",
-            "improve logging format and verbosity",
-            "streamline data processing pipeline",
-            "standardize exception handling across modules",
-            "optimize string formatting and allocations",
-            "adjust retry policy and exponential backoff"
-        };
+            Console.WriteLine($"\n🗑️ Đang gỡ bỏ Windows Task Scheduler: '{taskName}'...");
 
-        var type = types[Random.Shared.Next(types.Length)];
-        var scope = scopes[Random.Shared.Next(scopes.Length)];
-        var action = actions[Random.Shared.Next(actions.Length)];
+            string psScript = $"Unregister-ScheduledTask -TaskName '{taskName}' -Confirm:$false -ErrorAction SilentlyContinue; Write-Host 'SUCCESS'";
+            var psi = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{psScript}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
 
-        return $"{type}({scope}): {action}";
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit();
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"✅ Đã gỡ bỏ thành công Task Scheduler '{taskName}'!");
+            Console.ResetColor();
+            return 0;
+        }
     }
     #endregion
 
@@ -482,7 +693,6 @@ class Program
             CreateNoWindow = true
         };
 
-        // Guarantee user author information
         psi.Environment["GIT_AUTHOR_NAME"] = config.GitUser.Name;
         psi.Environment["GIT_AUTHOR_EMAIL"] = config.GitUser.Email;
         psi.Environment["GIT_COMMITTER_NAME"] = config.GitUser.Name;
@@ -556,7 +766,7 @@ class Program
         Console.WriteLine(@"
 Sử dụng: AutoCommit.exe [tùy chọn]
 
-Tùy chọn:
+Tùy chọn chung:
   --fill <YYYY-MM-DD>               Bù commit cho một ngày trong quá khứ (ví dụ: --fill 2026-08-20)
   --fill-range <FROM>:<TO>          Bù commit cho một khoảng ngày (ví dụ: --fill-range 2026-08-15:2026-08-20)
   --count <số lượng>                Số lượng commit tạo ra mỗi ngày (ghi đè cấu hình)
@@ -565,10 +775,17 @@ Tùy chọn:
   --repo <đường dẫn thư mục repo>   Chỉ định thư mục repo Git
   -h, --help                        Hiển thị trợ giúp này
 
+Tùy chọn Task Scheduler:
+  --install-task                    Tự động đăng ký Windows Task Scheduler (quyền Admin + S4U)
+  --uninstall-task                  Gỡ bỏ Windows Task Scheduler
+  --time <HH:mm>                    Giờ chạy hàng ngày khi cài Task (mặc định: 09:15)
+  --task-name <tên>                 Tên của Task trong Task Scheduler (mặc định: AutoCommit_Daily)
+
 Ví dụ:
-  AutoCommit.exe                               Chạy tự động (thời gian tăng dần sau commit mới nhất)
+  AutoCommit.exe                               Chạy tự động bình thường
+  AutoCommit.exe --install-task --time 09:30   Đăng ký Task Scheduler chạy ngầm 09:30 sáng hàng ngày
+  AutoCommit.exe --uninstall-task              Gỡ bỏ Task Scheduler
   AutoCommit.exe --fill 2026-08-27 --count 3   Bù 3 commit rải rác cho ngày 27/08/2026
-  AutoCommit.exe --fill-range 2026-08-20:2026-08-25
 ");
     }
     #endregion
@@ -580,6 +797,7 @@ public class AppConfig
     public GitUserConfig GitUser { get; set; } = new GitUserConfig();
     public string Branch { get; set; } = "master";
     public MinMaxConfig CommitsPerRun { get; set; } = new MinMaxConfig { Min = 1, Max = 5 };
+    public KnowledgeSyncConfig KnowledgeSync { get; set; } = new KnowledgeSyncConfig();
     public WhatTheCommitConfig WhatTheCommit { get; set; } = new WhatTheCommitConfig();
     public AutoStreakConfig AutoStreakRecovery { get; set; } = new AutoStreakConfig();
     public TelegramConfig Telegram { get; set; } = new TelegramConfig();
@@ -628,6 +846,13 @@ public class MinMaxConfig
     public int Max { get; set; } = 5;
 }
 
+public class KnowledgeSyncConfig
+{
+    public bool Enabled { get; set; } = true;
+    public string Source { get; set; } = "mixed";
+    public string NotesDirectory { get; set; } = "notes";
+}
+
 public class WhatTheCommitConfig
 {
     public bool Enabled { get; set; } = true;
@@ -653,6 +878,10 @@ public class CliOptions
 {
     public bool ShowHelp { get; set; }
     public bool NoPush { get; set; }
+    public bool InstallTask { get; set; }
+    public bool UninstallTask { get; set; }
+    public string TaskTime { get; set; } = "09:15";
+    public string TaskName { get; set; } = "AutoCommit_Daily";
     public int? CustomCommitCount { get; set; }
     public string? CustomRepoPath { get; set; }
     public string? CustomConfigPath { get; set; }
@@ -671,6 +900,22 @@ public class CliOptions
             {
                 opts.ShowHelp = true;
                 return opts;
+            }
+            else if (arg.Equals("--install-task", StringComparison.OrdinalIgnoreCase))
+            {
+                opts.InstallTask = true;
+            }
+            else if (arg.Equals("--uninstall-task", StringComparison.OrdinalIgnoreCase))
+            {
+                opts.UninstallTask = true;
+            }
+            else if (arg.Equals("--time", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                opts.TaskTime = args[++i];
+            }
+            else if (arg.Equals("--task-name", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                opts.TaskName = args[++i];
             }
             else if (arg.Equals("--no-push", StringComparison.OrdinalIgnoreCase))
             {

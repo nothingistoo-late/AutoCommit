@@ -2,13 +2,13 @@
 
 <p align="center">
   <b>A smart, natural, and resilient Git automation tool built with .NET 8</b><br>
-  <i>Tự động hóa commit & push Git thông minh, rải thời gian tự nhiên tức thì, chống đứt chuỗi xanh và thông báo Telegram.</i>
+  <i>Tự động hóa commit & push Git thông minh, rải thời gian xuôi chiều tuyệt đối, chống đứt chuỗi xanh và thông báo Telegram.</i>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat&logo=dotnet&logoColor=white" alt=".NET 8" />
   <img src="https://img.shields.io/badge/Git-Automation-F05032?style=flat&logo=git&logoColor=white" alt="Git" />
-  <img src="https://img.shields.io/badge/Speed-Instant_Time_Scatter-success" alt="Instant Time-Scatter" />
+  <img src="https://img.shields.io/badge/Time_Engine-Monotonic_Scatter-success" alt="Monotonic Time Engine" />
   <img src="https://img.shields.io/badge/Telegram-Notifications-2CA5E0?style=flat&logo=telegram&logoColor=white" alt="Telegram" />
   <img src="https://img.shields.io/badge/License-MIT-blue" alt="License" />
 </p>
@@ -26,19 +26,22 @@
 ## 📖 Giới thiệu
 **AutoCommit** là công cụ dòng lệnh (CLI) được viết bằng C# (.NET 8) giúp duy trì hoạt động commit và lịch sử đóng góp (GitHub contribution graph) một cách **tự nhiên**, **an toàn**, và **siêu nhanh**.
 
-### ⚡ Điểm đột phá ở Phiên bản 3.1:
-* **Không cần ngồi chờ (Zero Wait)**: Toàn bộ quá trình commit và push chỉ mất **1 – 2 giây**.
-* **Rải mốc thời gian tự nhiên (Instant Time-Scattering)**: Các commit tự động mang các mốc thời gian rải rác từ sáng đến chiều (`09:15`, `11:40`, `15:30`), tạo lịch sử đóng góp như người thật làm việc cả ngày!
-* **Tránh lộ bot 100%**: Sử dụng WhatTheCommit API + Bộ sinh Conventional Commit chất lượng cao.
-* **Không sợ mất chuỗi (Streak Healer)**: Tự động phát hiện và bù ngày bị thiếu commit.
-* **Thông báo tức thì qua Telegram**: Gửi kết quả về điện thoại ngay sau khi push.
+### ⚡ Điểm đột phá cốt lõi:
+* **Không cần ngồi chờ (Zero Wait)**: Toàn bộ quá trình tạo nhiều commit và push chỉ mất **1 – 2 giây**.
+* **Động cơ thời gian xuôi chiều (Monotonic Time Engine)**: Tự động kiểm tra mốc giờ của **commit gần nhất trong repo**, đảm bảo các commit mới **luôn luôn tăng dần và nằm sau commit trước** (`09:46` ➡️ `10:00` ➡️ `10:20` ➡️ `10:26`), tuyệt đối không bao giờ bị nhảy lùi về quá khứ!
+* **Tránh lộ bot 100%**: Sử dụng WhatTheCommit API + Bộ sinh Conventional Commit chất lượng cao (> 3.000 biến thể).
+* **Không sợ mất chuỗi (Streak Healer)**: Tự động phát hiện và bù ngày bị thiếu commit trong quá khứ.
+* **Thông báo tức thì qua Telegram**: Báo cáo kết quả chi tiết về điện thoại ngay sau khi hoàn tất.
 
 ---
 
 ## 📜 Lịch sử phiên bản (Changelog)
 
-### 🌟 Phiên bản 3.1 (Hiện tại) - *Instant Time-Scattering & Stealth Upgrade*
-* **⚡ Động cơ Rải mốc thời gian tức thì (Instant Time-Scattering)**: Tự động phân bổ các mốc commit ngẫu nhiên tăng dần trong khung giờ làm việc (`08:30` -> `Hiện tại`) mà không cần `Task.Delay` ngồi đợi, hoàn thành mọi thứ trong 1-2 giây.
+### 🌟 Phiên bản 3.2 (Hiện tại) - *Monotonic Time & Stealth Upgrade*
+* **⚡ Động cơ Thời gian xuôi chiều (Monotonic Time-Scattering Engine)**: 
+  * Tự động truy vấn `git log -1` để lấy mốc thời gian commit mới nhất.
+  * Tự động phân bổ các commit tiếp theo tăng dần theo thứ tự thời gian (`T_mới > T_cũ`), giữ cho cây lịch sử Git luôn thẳng tắp và hoàn hảo.
+  * Hoàn thành toàn bộ commit trong 1-2 giây mà không cần `Task.Delay` đóng băng tiến trình.
 * **🌐 Tích hợp API WhatTheCommit**: Lấy commit message hài hước, ngẫu nhiên từ `whatthecommit.com`.
 * **🛡️ Bộ sinh Conventional Commits Offline**: Khi mất mạng, tự động chuyển sang bộ ghép từ chuẩn sinh ra hơn **3.000+ commit message** (`feat(api): optimize memory allocation...`), đảm bảo app không bao giờ crash.
 * **⚙️ Cấu hình `config.json`**: Tách toàn bộ thiết lập ra ngoài file JSON, không cần compile lại source code.
@@ -46,7 +49,7 @@
   * **Tự động (Auto-Heal)**: Quét `git log`, tự phát hiện ngày hôm qua/quá khứ gần bị thiếu commit và tự động tạo commit bù.
   * **Thủ công (Manual Backdate)**: Hỗ trợ lệnh CLI bù ngày bất kỳ (`--fill`) hoặc cả khoảng ngày (`--fill-range`).
 * **📱 Thông báo Telegram**: Bắn báo cáo tổng kết kèm trạng thái push về điện thoại qua Telegram Bot.
-* **🔒 Khắc phục triệt để Task Scheduler**: Gắn cứng thông tin tác giả vào Git environment của process.
+* **🔒 Khắc phục triệt để Task Scheduler**: Gắn cứng thông tin tác giả vào Git environment của process, tránh lỗi nhận sai domain công ty.
 
 ### 🔹 Phiên bản 2 - *Multi-Commit & Skewed Distribution*
 * **Nhiều commit mỗi lần chạy**: Cho phép random số lượng commit trong khoảng `[min, max]`.
@@ -121,7 +124,7 @@ File `config.json` nằm tại thư mục gốc của repository:
 ## 💻 Danh sách lệnh CLI & Ví dụ
 
 ```powershell
-# 1. Chạy tự động (rải mốc thời gian tức thì theo config.json)
+# 1. Chạy tự động (thời gian tăng dần sau commit mới nhất theo config.json)
 dotnet run --project AutoCommit\AutoCommit.csproj
 
 # 2. Bù commit cho 1 ngày cụ thể trong quá khứ (ví dụ: 20/08/2026 với 3 commit rải rác)
@@ -159,11 +162,11 @@ dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 # 🇬🇧 English
 
 ## 📖 Overview
-**AutoCommit** is an advanced Git automation CLI tool written in C# (.NET 8). It keeps your GitHub contribution graph alive and **realistic** by using an **Instant Time-Scattering Engine** — achieving natural daily activity across working hours in just 1-2 seconds without freezing your computer.
+**AutoCommit** is an advanced Git automation CLI tool written in C# (.NET 8). It keeps your GitHub contribution graph alive and **realistic** using an **Instant Monotonic Time-Scattering Engine** — achieving natural daily activity across working hours in just 1-2 seconds without freezing your computer.
 
-### ⚡ Highlights in Version 3.1:
-* **Instant Execution (Zero Wait)**: Commits and pushes in under 2 seconds.
-* **Instant Time-Scattering Engine**: Commits carry realistic, ascending timestamps scattered across the working day (`09:15`, `11:40`, `15:30`).
+### ⚡ Highlights in Version 3.2:
+* **Instant Execution (Zero Wait)**: Commits and pushes everything in under 2 seconds.
+* **Monotonic Time Engine**: Checks the latest commit timestamp in Git history, ensuring newly created commits **always strictly advance forward in time** (`09:46` ➡️ `10:00` ➡️ `10:20` ➡️ `10:26`), preventing non-chronological history jumps.
 * **WhatTheCommit & Conventional Commits**: Rich, humorous, and natural commit messages.
 * **Dual Streak Protector**: Auto-heals missed days and supports manual backdating via CLI.
 * **Instant Telegram Alerts**: Real-time push notifications sent straight to your phone.
@@ -172,8 +175,8 @@ dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 
 ## 📜 Version History (Changelog)
 
-### 🌟 Version 3.1 (Current) - *Instant Time-Scattering & Stealth Upgrade*
-* **⚡ Instant Time-Scattering Engine**: Replaces long sleep delays by dynamically calculating sorted, realistic timestamps throughout working hours, finishing everything in seconds.
+### 🌟 Version 3.2 (Current) - *Monotonic Time & Stealth Upgrade*
+* **⚡ Monotonic Time-Scattering Engine**: Dynamically queries `git log -1` to inherit the latest commit timestamp and generate strictly increasing timestamps (`T_new > T_prev`), completing all operations in seconds without freezing.
 * **🌐 WhatTheCommit API Integration**: Fetches dynamic commit messages from `whatthecommit.com`.
 * **🛡️ Offline Conventional Commits Generator**: Features a zero-dependency generator creating **3,000+** realistic commit messages when offline.
 * **⚙️ External Configuration (`config.json`)**: Easily configure authors, branches, and features without rebuilding.
@@ -228,7 +231,7 @@ dotnet run --project AutoCommit\AutoCommit.csproj -- --help
 ## 💻 CLI Commands & Examples
 
 ```powershell
-# 1. Normal run (with instant time-scattering and auto-heal)
+# 1. Normal run (with monotonic time-scattering and auto-heal)
 dotnet run --project AutoCommit\AutoCommit.csproj
 
 # 2. Backdate commits for a specific date in the past

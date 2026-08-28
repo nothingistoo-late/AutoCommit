@@ -5,3 +5,4 @@
 | ID | Title | Difficulty | Language | Solution File | Date |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 3734 | [Lexicographically Smallest Palindromic Permutation Greater Than Target](https://leetcode.com/problems/lexicographically-smallest-palindromic-permutation-greater-than-target/) | **Hard** | 🟣 CSHARP | [Problem3734_LexicographicallySmallestPalindromicPermutationGreaterThan.cs](solutions/csharp/Problem3734_LexicographicallySmallestPalindromicPermutationGreaterThan.cs) | `2026-08-28` |
+| 3734 | [Lexicographically Smallest Palindromic Permutation Greater Than Target](https://leetcode.com/problems/lexicographically-smallest-palindromic-permutation-greater-than-target/) | **Hard** | 🐍 PYTHON | [problem_3734_lexicographically_smallest_palindromic_p.py](solutions/python/problem_3734_lexicographically_smallest_palindromic_p.py) | `2026-08-28` |

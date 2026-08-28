@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 class Program
@@ -58,38 +57,28 @@ class Program
                 // Auto Streak Healer check (Check missing dates in recent days)
                 if (config.AutoStreakRecovery.Enabled)
                 {
-                    await AutoHealStreakAsync(repoPath, config, cli.NoDelay, summaryLogs, createdCommitMessages);
+                    await AutoHealStreakAsync(repoPath, config, summaryLogs, createdCommitMessages);
                 }
 
-                // Normal commit execution for today
+                // Normal commit execution for today with Instant Time-Scattering
                 int commitCount = cli.CustomCommitCount ?? RandomSkewedLow(config.CommitsPerRun.Min, config.CommitsPerRun.Max);
-                Console.WriteLine($"\n🌱 Sẽ tạo {commitCount} commit cho hôm nay ({DateTime.Now:yyyy-MM-dd})...");
+                Console.WriteLine($"\n🌱 Sẽ tạo {commitCount} commit rải rác thông minh cho hôm nay ({DateTime.Now:yyyy-MM-dd})...");
 
                 string logFilePath = Path.Combine(repoPath, "autocommit_log.txt");
+                var timestamps = GenerateScatteredTimestamps(DateTime.Today, commitCount, isToday: true);
 
-                for (int i = 1; i <= commitCount; i++)
+                for (int i = 0; i < commitCount; i++)
                 {
-                    DateTime now = DateTime.Now;
+                    DateTime commitTime = timestamps[i];
                     string commitMsg = await GetCommitMessageAsync(config);
                     
-                    File.AppendAllText(logFilePath, $"[{now:yyyy-MM-dd HH:mm:ss}] Commit {i}/{commitCount}: {commitMsg}\n");
+                    File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] Commit {i + 1}/{commitCount}: {commitMsg}\n");
 
                     RunGit(repoPath, "add .", config);
-                    var commitRes = RunGit(repoPath, $"commit -m \"{EscapeQuote(commitMsg)}\"", config);
+                    RunGit(repoPath, $"commit -m \"{EscapeQuote(commitMsg)}\"", config, customDate: commitTime);
                     
                     createdCommitMessages.Add(commitMsg);
-                    Console.WriteLine($"  [{i}/{commitCount}] ✅ Đã commit: \"{commitMsg}\"");
-
-                    // Jitter delay between commits if more commits are coming
-                    if (i < commitCount && !cli.NoDelay && config.DelaySeconds.Max > 0)
-                    {
-                        int delaySec = Random.Shared.Next(
-                            Math.Max(1, config.DelaySeconds.Min),
-                            Math.Max(config.DelaySeconds.Min, config.DelaySeconds.Max) + 1
-                        );
-                        Console.WriteLine($"  ⏳ Nghỉ ngơi tự nhiên {delaySec} giây trước commit tiếp theo...");
-                        await Task.Delay(TimeSpan.FromSeconds(delaySec));
-                    }
+                    Console.WriteLine($"  [{i + 1}/{commitCount}] ✅ Đã commit ({commitTime:HH:mm:ss}): \"{commitMsg}\"");
                 }
 
                 summaryLogs.Add($"Hôm nay ({DateTime.Now:yyyy-MM-dd}): {commitCount} commits");
@@ -121,7 +110,7 @@ class Program
                 Console.WriteLine("\nℹ️ Cờ --no-push được bật: Bỏ qua bước đẩy lên remote.");
             }
 
-            Console.WriteLine("\n🎉 Hoàn thành xuất sắc toàn bộ quy trình AutoCommit!");
+            Console.WriteLine("\n🎉 Hoàn thành xuất sắc toàn bộ quy trình AutoCommit (Chỉ trong vài giây)!");
             return 0;
         }
         catch (Exception ex)
@@ -146,6 +135,85 @@ class Program
         }
     }
 
+    #region Time-Scattering Engine
+    /// <summary>
+    /// Sinh ra danh sách mốc thời gian tăng dần rải rác tự nhiên trong ngày làm việc.
+    /// Giúp tạo lịch sử commit trải dài từ sáng đến chiều mà không cần ngồi chờ thật!
+    /// </summary>
+    static List<DateTime> GenerateScatteredTimestamps(DateTime date, int count, bool isToday)
+    {
+        count = Math.Max(1, count);
+        var timestamps = new List<DateTime>();
+
+        // Khung giờ làm việc lý tưởng: 08:30 -> 18:30 (hoặc thời điểm hiện tại nếu là hôm nay)
+        DateTime startWindow = new DateTime(date.Year, date.Month, date.Day, 8, 30, 0);
+        DateTime endWindow;
+
+        if (isToday)
+        {
+            DateTime now = DateTime.Now;
+            if (now.Hour < 9)
+            {
+                // Nếu chạy quá sớm (trước 9h sáng), bắt đầu từ 07:00 -> now
+                startWindow = new DateTime(date.Year, date.Month, date.Day, Math.Max(6, now.Hour - 2), 0, 0);
+                endWindow = now;
+            }
+            else
+            {
+                endWindow = now;
+            }
+        }
+        else
+        {
+            // Các ngày trong quá khứ: rải đều trong khoảng 09:00 -> 18:30
+            startWindow = new DateTime(date.Year, date.Month, date.Day, 9, 0, 0);
+            endWindow = new DateTime(date.Year, date.Month, date.Day, 18, 30, 0);
+        }
+
+        if (endWindow <= startWindow)
+        {
+            endWindow = startWindow.AddMinutes(Math.Max(15, count * 5));
+        }
+
+        double totalSeconds = (endWindow - startWindow).TotalSeconds;
+        if (totalSeconds < count * 60)
+        {
+            // Khoảng thời gian hẹp: cách nhau mỗi commit 2-5 phút
+            for (int i = 0; i < count; i++)
+            {
+                timestamps.Add(endWindow.AddMinutes(-(count - 1 - i) * 3));
+            }
+            return timestamps;
+        }
+
+        // Bốc ngẫu nhiên 'count' điểm mốc giây rồi sắp xếp tăng dần
+        var offsets = new List<int>();
+        for (int i = 0; i < count; i++)
+        {
+            offsets.Add(Random.Shared.Next(0, (int)totalSeconds));
+        }
+        offsets.Sort();
+
+        // Đảm bảo mỗi commit cách nhau ít nhất 60-180 giây
+        for (int i = 1; i < offsets.Count; i++)
+        {
+            if (offsets[i] <= offsets[i - 1])
+            {
+                offsets[i] = offsets[i - 1] + Random.Shared.Next(60, 180);
+            }
+        }
+
+        foreach (var offset in offsets)
+        {
+            DateTime dt = startWindow.AddSeconds(offset);
+            if (dt > endWindow) dt = endWindow;
+            timestamps.Add(dt);
+        }
+
+        return timestamps;
+    }
+    #endregion
+
     #region Manual Fill / Backdate Logic
     static async Task ExecuteManualFillAsync(string repoPath, AppConfig config, CliOptions cli, List<string> summaryLogs, List<string> commitMessages)
     {
@@ -155,29 +223,20 @@ class Program
 
         foreach (var targetDate in cli.FillDates)
         {
-            Console.WriteLine($"\n📅 Đang tạo {commitsPerDay} commit bù cho ngày: {targetDate:yyyy-MM-dd}...");
+            Console.WriteLine($"\n📅 Đang tạo {commitsPerDay} commit bù rải rác cho ngày: {targetDate:yyyy-MM-dd}...");
+            var timestamps = GenerateScatteredTimestamps(targetDate, commitsPerDay, isToday: false);
 
-            for (int i = 1; i <= commitsPerDay; i++)
+            for (int i = 0; i < commitsPerDay; i++)
             {
-                // Randomize time during realistic working hours (09:00 - 18:30)
-                int hour = Random.Shared.Next(9, 19);
-                int minute = Random.Shared.Next(0, 60);
-                int second = Random.Shared.Next(0, 60);
-                DateTime commitTime = new DateTime(targetDate.Year, targetDate.Month, targetDate.Day, hour, minute, second);
-
+                DateTime commitTime = timestamps[i];
                 string commitMsg = await GetCommitMessageAsync(config);
-                File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] [Backdate] Commit {i}/{commitsPerDay}: {commitMsg}\n");
+                File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] [Backdate] Commit {i + 1}/{commitsPerDay}: {commitMsg}\n");
 
                 RunGit(repoPath, "add .", config);
                 RunGit(repoPath, $"commit -m \"{EscapeQuote(commitMsg)}\"", config, customDate: commitTime);
 
                 commitMessages.Add(commitMsg);
-                Console.WriteLine($"  [{i}/{commitsPerDay}] ✅ Đã bù ({commitTime:yyyy-MM-dd HH:mm:ss}): \"{commitMsg}\"");
-
-                if (i < commitsPerDay && !cli.NoDelay && config.DelaySeconds.Min > 0)
-                {
-                    await Task.Delay(1000); // 1s minimal delay in fill mode
-                }
+                Console.WriteLine($"  [{i + 1}/{commitsPerDay}] ✅ Đã bù ({commitTime:HH:mm:ss}): \"{commitMsg}\"");
             }
 
             summaryLogs.Add($"Bù ngày {targetDate:yyyy-MM-dd}: {commitsPerDay} commits");
@@ -186,7 +245,7 @@ class Program
     #endregion
 
     #region Auto Streak Recovery
-    static async Task AutoHealStreakAsync(string repoPath, AppConfig config, bool noDelay, List<string> summaryLogs, List<string> commitMessages)
+    static async Task AutoHealStreakAsync(string repoPath, AppConfig config, List<string> summaryLogs, List<string> commitMessages)
     {
         int pastDays = Math.Max(1, config.AutoStreakRecovery.CheckPastDays);
         DateTime today = DateTime.Today;
@@ -213,30 +272,26 @@ class Program
         if (missedDates.Count > 0)
         {
             Console.WriteLine($"\n🛡️ [Auto Streak Healer] Phát hiện {missedDates.Count} ngày bị lỡ commit: {string.Join(", ", missedDates.Select(d => d.ToString("yyyy-MM-dd")))}");
-            Console.WriteLine("   Tiến hành tự động tạo commit cứu chuỗi...");
+            Console.WriteLine("   Tiến hành tự động tạo commit cứu chuỗi (rải rác tự nhiên)...");
 
             string logFilePath = Path.Combine(repoPath, "autocommit_log.txt");
             int commitsPerDay = Math.Max(1, config.AutoStreakRecovery.CommitsPerMissedDay);
 
             foreach (var missedDate in missedDates.OrderBy(d => d))
             {
-                for (int i = 1; i <= commitsPerDay; i++)
-                {
-                    int hour = Random.Shared.Next(10, 18);
-                    int minute = Random.Shared.Next(0, 60);
-                    int second = Random.Shared.Next(0, 60);
-                    DateTime commitTime = new DateTime(missedDate.Year, missedDate.Month, missedDate.Day, hour, minute, second);
+                var timestamps = GenerateScatteredTimestamps(missedDate, commitsPerDay, isToday: false);
 
+                for (int i = 0; i < commitsPerDay; i++)
+                {
+                    DateTime commitTime = timestamps[i];
                     string commitMsg = await GetCommitMessageAsync(config);
-                    File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] [AutoHeal] Commit {i}/{commitsPerDay}: {commitMsg}\n");
+                    File.AppendAllText(logFilePath, $"[{commitTime:yyyy-MM-dd HH:mm:ss}] [AutoHeal] Commit {i + 1}/{commitsPerDay}: {commitMsg}\n");
 
                     RunGit(repoPath, "add .", config);
                     RunGit(repoPath, $"commit -m \"{EscapeQuote(commitMsg)}\"", config, customDate: commitTime);
 
                     commitMessages.Add(commitMsg);
                     Console.WriteLine($"  [AutoHeal] ✅ Đã cứu ngày {missedDate:yyyy-MM-dd} ({commitTime:HH:mm:ss}): \"{commitMsg}\"");
-
-                    if (!noDelay) await Task.Delay(1000);
                 }
 
                 summaryLogs.Add($"Tự động bù ngày {missedDate:yyyy-MM-dd}: {commitsPerDay} commits");
@@ -472,17 +527,15 @@ Tùy chọn:
   --fill <YYYY-MM-DD>               Bù commit cho một ngày trong quá khứ (ví dụ: --fill 2026-08-20)
   --fill-range <FROM>:<TO>          Bù commit cho một khoảng ngày (ví dụ: --fill-range 2026-08-15:2026-08-20)
   --count <số lượng>                Số lượng commit tạo ra mỗi ngày (ghi đè cấu hình)
-  --no-delay                        Bỏ qua thời gian chờ ngẫu nhiên giữa các commit
   --no-push                         Chỉ tạo commit local, không đẩy lên remote
   --config <đường dẫn file JSON>    Chỉ định file cấu hình config.json khác
   --repo <đường dẫn thư mục repo>   Chỉ định thư mục repo Git
   -h, --help                        Hiển thị trợ giúp này
 
 Ví dụ:
-  AutoCommit.exe                               Chạy tự động bình thường theo cấu hình config.json
-  AutoCommit.exe --no-delay                    Chạy nhanh không chờ độ trễ
-  AutoCommit.exe --fill 2026-08-27 --count 3   Bù 3 commit cho ngày 27/08/2026
-  AutoCommit.exe --fill-range 2026-08-20:2026-08-25 --no-delay
+  AutoCommit.exe                               Chạy tự động (rải thời gian tức thì theo config.json)
+  AutoCommit.exe --fill 2026-08-27 --count 3   Bù 3 commit rải rác cho ngày 27/08/2026
+  AutoCommit.exe --fill-range 2026-08-20:2026-08-25
 ");
     }
     #endregion
@@ -494,7 +547,6 @@ public class AppConfig
     public GitUserConfig GitUser { get; set; } = new GitUserConfig();
     public string Branch { get; set; } = "master";
     public MinMaxConfig CommitsPerRun { get; set; } = new MinMaxConfig { Min = 1, Max = 5 };
-    public MinMaxConfig DelaySeconds { get; set; } = new MinMaxConfig { Min = 15, Max = 90 };
     public WhatTheCommitConfig WhatTheCommit { get; set; } = new WhatTheCommitConfig();
     public AutoStreakConfig AutoStreakRecovery { get; set; } = new AutoStreakConfig();
     public TelegramConfig Telegram { get; set; } = new TelegramConfig();
@@ -567,7 +619,6 @@ public class TelegramConfig
 public class CliOptions
 {
     public bool ShowHelp { get; set; }
-    public bool NoDelay { get; set; }
     public bool NoPush { get; set; }
     public int? CustomCommitCount { get; set; }
     public string? CustomRepoPath { get; set; }
@@ -587,10 +638,6 @@ public class CliOptions
             {
                 opts.ShowHelp = true;
                 return opts;
-            }
-            else if (arg.Equals("--no-delay", StringComparison.OrdinalIgnoreCase))
-            {
-                opts.NoDelay = true;
             }
             else if (arg.Equals("--no-push", StringComparison.OrdinalIgnoreCase))
             {

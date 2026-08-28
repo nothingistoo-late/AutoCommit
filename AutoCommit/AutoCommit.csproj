@@ -5,6 +5,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>..\app.ico</ApplicationIcon>
+    <Version>3.4.0</Version>
+    <AssemblyTitle>AutoCommit</AssemblyTitle>
+    <Product>AutoCommit</Product>
+    <Authors>hctrung2k4</Authors>
   </PropertyGroup>
 
   <ItemGroup>

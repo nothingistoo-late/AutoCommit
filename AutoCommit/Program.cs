@@ -1016,6 +1016,23 @@ public class AppConfig
             }
         }
 
+        // Check if config.example.json exists and auto-copy to config.json
+        string examplePath = Path.Combine(repoPath, "config.example.json");
+        string targetConfigPath = Path.Combine(repoPath, "config.json");
+        if (File.Exists(examplePath) && !File.Exists(targetConfigPath))
+        {
+            try
+            {
+                File.Copy(examplePath, targetConfigPath, overwrite: false);
+                Console.WriteLine("ℹ️ Đã tự động tạo file config.json từ config.example.json.");
+                string json = File.ReadAllText(targetConfigPath);
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var loaded = JsonSerializer.Deserialize<AppConfig>(json, opts);
+                if (loaded != null) return loaded;
+            }
+            catch { }
+        }
+
         Console.WriteLine("ℹ️ Sử dụng cấu hình mặc định trong ứng dụng.");
         return new AppConfig();
     }

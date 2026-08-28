@@ -11,6 +11,9 @@
     <None Include="..\config.json" Link="config.json" Condition="Exists('..\config.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\config.example.json" Link="config.example.json" Condition="Exists('..\config.example.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="config.json" Condition="Exists('config.json')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -1,0 +1,39 @@
+{
+  "gitUser": {
+    "name": "YOUR_GITHUB_USERNAME",
+    "email": "YOUR_GITHUB_EMAIL@example.com"
+  },
+  "branch": "master",
+  "commitsPerRun": {
+    "min": 1,
+    "max": 5
+  },
+  "languages": [
+    "csharp",
+    "python",
+    "typescript",
+    "golang",
+    "rust",
+    "java",
+    "cpp"
+  ],
+  "knowledgeSync": {
+    "enabled": true,
+    "solutionsDirectory": "solutions"
+  },
+  "whatTheCommit": {
+    "enabled": true,
+    "apiUrl": "https://whatthecommit.com/index.txt",
+    "timeoutSeconds": 4
+  },
+  "autoStreakRecovery": {
+    "enabled": true,
+    "checkPastDays": 3,
+    "commitsPerMissedDay": 2
+  },
+  "telegram": {
+    "enabled": false,
+    "botToken": "YOUR_BOT_TOKEN_HERE",
+    "chatId": "YOUR_CHAT_ID_HERE"
+  }
+}

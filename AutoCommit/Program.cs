@@ -60,12 +60,19 @@ class Program
                     await AutoHealStreakAsync(repoPath, config, summaryLogs, createdCommitMessages);
                 }
 
-                // Normal commit execution for today with Instant Time-Scattering
+                // Query the latest commit in repo to guarantee strictly increasing chronological order
+                DateTime? lastCommitTime = GetLatestCommitTime(repoPath, config);
+                if (lastCommitTime.HasValue)
+                {
+                    Console.WriteLine($"🕒 Commit mới nhất trước đó: {lastCommitTime.Value:yyyy-MM-dd HH:mm:ss}");
+                }
+
+                // Normal commit execution for today with Monotonic Time-Scattering
                 int commitCount = cli.CustomCommitCount ?? RandomSkewedLow(config.CommitsPerRun.Min, config.CommitsPerRun.Max);
-                Console.WriteLine($"\n🌱 Sẽ tạo {commitCount} commit rải rác thông minh cho hôm nay ({DateTime.Now:yyyy-MM-dd})...");
+                Console.WriteLine($"\n🌱 Sẽ tạo {commitCount} commit rải rác tăng dần cho hôm nay ({DateTime.Now:yyyy-MM-dd})...");
 
                 string logFilePath = Path.Combine(repoPath, "autocommit_log.txt");
-                var timestamps = GenerateScatteredTimestamps(DateTime.Today, commitCount, isToday: true);
+                var timestamps = GenerateMonotonicTimestamps(lastCommitTime, DateTime.Today, commitCount, isToday: true);
 
                 for (int i = 0; i < commitCount; i++)
                 {
@@ -110,7 +117,7 @@ class Program
                 Console.WriteLine("\nℹ️ Cờ --no-push được bật: Bỏ qua bước đẩy lên remote.");
             }
 
-            Console.WriteLine("\n🎉 Hoàn thành xuất sắc toàn bộ quy trình AutoCommit (Chỉ trong vài giây)!");
+            Console.WriteLine("\n🎉 Hoàn thành xuất sắc toàn bộ quy trình AutoCommit (Thời gian luôn xuôi chiều tuyệt đối)!");
             return 0;
         }
         catch (Exception ex)
@@ -135,28 +142,52 @@ class Program
         }
     }
 
-    #region Time-Scattering Engine
+    #region Monotonic Time-Scattering Engine
     /// <summary>
-    /// Sinh ra danh sách mốc thời gian tăng dần rải rác tự nhiên trong ngày làm việc.
-    /// Giúp tạo lịch sử commit trải dài từ sáng đến chiều mà không cần ngồi chờ thật!
+    /// Lấy mốc thời gian của commit gần nhất trong repo Git.
     /// </summary>
-    static List<DateTime> GenerateScatteredTimestamps(DateTime date, int count, bool isToday)
+    static DateTime? GetLatestCommitTime(string repoPath, AppConfig config)
+    {
+        var res = RunGit(repoPath, "log -1 --date=iso-strict --pretty=format:\"%cd\"", config);
+        if (res.ExitCode == 0 && !string.IsNullOrWhiteSpace(res.StdOut))
+        {
+            if (DateTimeOffset.TryParse(res.StdOut.Trim(), out var dto))
+            {
+                return dto.LocalDateTime;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Sinh ra danh sách mốc thời gian LUÔN TĂNG DẦN và NẰM SAU commit mới nhất.
+    /// Đảm bảo cây lịch sử Git luôn xuôi chiều 100%, không bao giờ bị nhảy cóc về quá khứ!
+    /// </summary>
+    static List<DateTime> GenerateMonotonicTimestamps(DateTime? lastCommitTime, DateTime date, int count, bool isToday)
     {
         count = Math.Max(1, count);
         var timestamps = new List<DateTime>();
 
-        // Khung giờ làm việc lý tưởng: 08:30 -> 18:30 (hoặc thời điểm hiện tại nếu là hôm nay)
+        // Giờ bắt đầu mặc định trong ngày: 08:30
         DateTime startWindow = new DateTime(date.Year, date.Month, date.Day, 8, 30, 0);
-        DateTime endWindow;
 
+        // NẾU commit gần nhất diễn ra trong CÙNG NGÀY ĐANG XÉT:
+        // Cửa sổ thời gian bắt buộc phải bắt đầu SAU commit gần nhất (cách 1 - 5 phút).
+        if (lastCommitTime.HasValue && lastCommitTime.Value.Date == date.Date)
+        {
+            if (lastCommitTime.Value >= startWindow)
+            {
+                startWindow = lastCommitTime.Value.AddMinutes(Random.Shared.Next(1, 6));
+            }
+        }
+
+        DateTime endWindow;
         if (isToday)
         {
             DateTime now = DateTime.Now;
-            if (now.Hour < 9)
+            if (now <= startWindow)
             {
-                // Nếu chạy quá sớm (trước 9h sáng), bắt đầu từ 07:00 -> now
-                startWindow = new DateTime(date.Year, date.Month, date.Day, Math.Max(6, now.Hour - 2), 0, 0);
-                endWindow = now;
+                endWindow = startWindow.AddMinutes(Math.Max(5, count * 3));
             }
             else
             {
@@ -165,23 +196,24 @@ class Program
         }
         else
         {
-            // Các ngày trong quá khứ: rải đều trong khoảng 09:00 -> 18:30
-            startWindow = new DateTime(date.Year, date.Month, date.Day, 9, 0, 0);
+            // Quá khứ: rải đều tới cuối giờ chiều (18:30)
             endWindow = new DateTime(date.Year, date.Month, date.Day, 18, 30, 0);
-        }
-
-        if (endWindow <= startWindow)
-        {
-            endWindow = startWindow.AddMinutes(Math.Max(15, count * 5));
+            if (endWindow <= startWindow)
+            {
+                endWindow = startWindow.AddMinutes(Math.Max(15, count * 5));
+            }
         }
 
         double totalSeconds = (endWindow - startWindow).TotalSeconds;
+
+        // Nếu khoảng cách quá hẹp (ví dụ chạy liên tiếp nhiều lần sát giờ hiện tại):
         if (totalSeconds < count * 60)
         {
-            // Khoảng thời gian hẹp: cách nhau mỗi commit 2-5 phút
+            DateTime current = startWindow;
             for (int i = 0; i < count; i++)
             {
-                timestamps.Add(endWindow.AddMinutes(-(count - 1 - i) * 3));
+                current = current.AddSeconds(Random.Shared.Next(60, 180));
+                timestamps.Add(current);
             }
             return timestamps;
         }
@@ -206,7 +238,6 @@ class Program
         foreach (var offset in offsets)
         {
             DateTime dt = startWindow.AddSeconds(offset);
-            if (dt > endWindow) dt = endWindow;
             timestamps.Add(dt);
         }
 
@@ -224,7 +255,8 @@ class Program
         foreach (var targetDate in cli.FillDates)
         {
             Console.WriteLine($"\n📅 Đang tạo {commitsPerDay} commit bù rải rác cho ngày: {targetDate:yyyy-MM-dd}...");
-            var timestamps = GenerateScatteredTimestamps(targetDate, commitsPerDay, isToday: false);
+            DateTime? lastCommit = GetLatestCommitTime(repoPath, config);
+            var timestamps = GenerateMonotonicTimestamps(lastCommit, targetDate, commitsPerDay, isToday: false);
 
             for (int i = 0; i < commitsPerDay; i++)
             {
@@ -272,14 +304,15 @@ class Program
         if (missedDates.Count > 0)
         {
             Console.WriteLine($"\n🛡️ [Auto Streak Healer] Phát hiện {missedDates.Count} ngày bị lỡ commit: {string.Join(", ", missedDates.Select(d => d.ToString("yyyy-MM-dd")))}");
-            Console.WriteLine("   Tiến hành tự động tạo commit cứu chuỗi (rải rác tự nhiên)...");
+            Console.WriteLine("   Tiến hành tự động tạo commit cứu chuỗi (rải rác tăng dần)...");
 
             string logFilePath = Path.Combine(repoPath, "autocommit_log.txt");
             int commitsPerDay = Math.Max(1, config.AutoStreakRecovery.CommitsPerMissedDay);
 
             foreach (var missedDate in missedDates.OrderBy(d => d))
             {
-                var timestamps = GenerateScatteredTimestamps(missedDate, commitsPerDay, isToday: false);
+                DateTime? lastCommit = GetLatestCommitTime(repoPath, config);
+                var timestamps = GenerateMonotonicTimestamps(lastCommit, missedDate, commitsPerDay, isToday: false);
 
                 for (int i = 0; i < commitsPerDay; i++)
                 {
@@ -533,7 +566,7 @@ Tùy chọn:
   -h, --help                        Hiển thị trợ giúp này
 
 Ví dụ:
-  AutoCommit.exe                               Chạy tự động (rải thời gian tức thì theo config.json)
+  AutoCommit.exe                               Chạy tự động (thời gian tăng dần sau commit mới nhất)
   AutoCommit.exe --fill 2026-08-27 --count 3   Bù 3 commit rải rác cho ngày 27/08/2026
   AutoCommit.exe --fill-range 2026-08-20:2026-08-25
 ");

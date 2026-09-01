@@ -1,7 +1,7 @@
 # LeetCode 3875: Construct Uniform Parity Array I
 # Difficulty: Easy | Tags: Array, Math
 # Link: https://leetcode.com/problems/construct-uniform-parity-array-i/
-# Solved on: 2026-08-31 15:08:12
+# Solved on: 2026-09-01 16:07:39
 
 class Solution:
     def solve(self, s: str, target: str) -> str:

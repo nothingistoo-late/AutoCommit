@@ -1,10 +1,27 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>..\app.ico</ApplicationIcon>
+    <Version>3.4.0</Version>
+    <AssemblyTitle>AutoCommit</AssemblyTitle>
+    <Product>AutoCommit</Product>
+    <Authors>hctrung2k4</Authors>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\config.json" Link="config.json" Condition="Exists('..\config.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\config.example.json" Link="config.example.json" Condition="Exists('..\config.example.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="config.json" Condition="Exists('config.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
 </Project>

@@ -1,0 +1,79 @@
+name: Build and Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (e.g. v3.4.0)"
+        required: true
+        default: "v3.4.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y --no-progress
+
+      - name: Publish .NET 8 Self-Contained Single File
+        run: |
+          dotnet publish AutoCommit/AutoCommit.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o ./publish/AutoCommit-win-x64
+
+      - name: Prepare Portable Package
+        shell: pwsh
+        run: |
+          # Copy extra docs and utilities into publish directory
+          Copy-Item -Path "app.ico" -Destination "./publish/AutoCommit-win-x64/" -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path "config.example.json" -Destination "./publish/AutoCommit-win-x64/" -Force
+          Copy-Item -Path "GUIDE.md" -Destination "./publish/AutoCommit-win-x64/" -Force
+          Copy-Item -Path "README.md" -Destination "./publish/AutoCommit-win-x64/" -Force
+          Copy-Item -Path "notes" -Destination "./publish/AutoCommit-win-x64/" -Recurse -Force
+
+          # Create Portable ZIP archive
+          Compress-Archive -Path "./publish/AutoCommit-win-x64/*" -DestinationPath "./AutoCommit_Portable.zip" -Force
+
+      - name: Compile Inno Setup Installer (AutoCommit_Setup.exe)
+        run: |
+          iscc installer.iss
+
+      - name: Upload Release Assets to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          name: AutoCommit Release ${{ github.event.inputs.tag_name || github.ref_name }}
+          body: |
+            ## 🚀 AutoCommit Release ${{ github.event.inputs.tag_name || github.ref_name }}
+
+            ### 📦 Download Packages:
+            * **`AutoCommit_Setup.exe`** (Recommended): Full Windows Setup Wizard with Desktop & Start Menu shortcuts.
+            * **`AutoCommit_Portable.zip`**: Standalone portable archive (extract and run).
+
+            ### 📖 Documentation:
+            * [User Guide (GUIDE.md)](https://github.com/${{ github.repository }}/blob/master/GUIDE.md)
+            * [Main README](https://github.com/${{ github.repository }}/blob/master/README.md)
+          files: |
+            dist/AutoCommit_Setup.exe
+            AutoCommit_Portable.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

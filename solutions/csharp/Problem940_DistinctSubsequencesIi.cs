@@ -4,7 +4,7 @@ namespace AutoCommit.Solutions;
 /// LeetCode 940: Distinct Subsequences II
 /// Difficulty: Hard | Tags: String, Dynamic Programming
 /// Link: https://leetcode.com/problems/distinct-subsequences-ii/
-/// Solved on: 2026-09-04 08:37:46
+/// Solved on: 2026-09-05 11:08:47
 /// </summary>
 public class Problem940_DistinctSubsequencesIi
 {

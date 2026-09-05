@@ -14,3 +14,4 @@
 | 3904 | [Smallest Stable Index II](https://leetcode.com/problems/smallest-stable-index-ii/) | **Medium** | 🟣 CSHARP | [Problem3904_SmallestStableIndexIi.cs](solutions/csharp/Problem3904_SmallestStableIndexIi.cs) | `2026-09-05` |
 | 3904 | [Smallest Stable Index II](https://leetcode.com/problems/smallest-stable-index-ii/) | **Medium** | 🐍 PYTHON | [problem_3904_smallest_stable_index_ii.py](solutions/python/problem_3904_smallest_stable_index_ii.py) | `2026-09-05` |
 | 3904 | [Smallest Stable Index II](https://leetcode.com/problems/smallest-stable-index-ii/) | **Medium** | 🔵 TYPESCRIPT | [problem_3904_smallest_stable_index_ii.ts](solutions/typescript/problem_3904_smallest_stable_index_ii.ts) | `2026-09-05` |
+| 3904 | [Smallest Stable Index II](https://leetcode.com/problems/smallest-stable-index-ii/) | **Medium** | 🩵 GOLANG | [problem_3904_smallest_stable_index_ii.go](solutions/golang/problem_3904_smallest_stable_index_ii.go) | `2026-09-05` |

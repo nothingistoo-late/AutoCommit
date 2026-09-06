@@ -24,3 +24,4 @@
 | 3875 | [Construct Uniform Parity Array I](https://leetcode.com/problems/construct-uniform-parity-array-i/) | **Easy** | 🦀 RUST | [problem_3875_construct_uniform_parity_array_i.rs](solutions/rust/problem_3875_construct_uniform_parity_array_i.rs) | `2026-09-02` |
 >>>>>>> 14d3cc4420ee79c1e2e7ef998460b22b52190800
 | 940 | [Distinct Subsequences II](https://leetcode.com/problems/distinct-subsequences-ii/) | **Hard** | 🟣 CSHARP | [Problem940_DistinctSubsequencesIi.cs](solutions/csharp/Problem940_DistinctSubsequencesIi.cs) | `2026-09-06` |
+| 940 | [Distinct Subsequences II](https://leetcode.com/problems/distinct-subsequences-ii/) | **Hard** | 🐍 PYTHON | [problem_0940_distinct_subsequences_ii.py](solutions/python/problem_0940_distinct_subsequences_ii.py) | `2026-09-06` |

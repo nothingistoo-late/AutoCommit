@@ -12,6 +12,15 @@ set /p END_DATE="Nhập ngày kết thúc (YYYY-MM-DD, vd: 2026-08-20): "
 set /p COUNT="Nhập số commit mỗi ngày (Mặc định: 2): "
 if "%COUNT%"=="" set COUNT=2
 
+if "%START_DATE%"=="" (
+    echo [Loi] Chua nhap ngay bat dau.
+    goto :end
+)
+if "%END_DATE%"=="" (
+    echo [Loi] Chua nhap ngay ket thuc.
+    goto :end
+)
+
 echo.
 echo Đang tiến hành tạo commit bù từ %START_DATE% đến %END_DATE% (%COUNT% commit/ngày)...
 echo.
@@ -22,6 +31,7 @@ if exist "AutoCommit\bin\Release\net8.0\AutoCommit.exe" (
     dotnet run --project AutoCommit\AutoCommit.csproj -- --fill-range %START_DATE%:%END_DATE% --count %COUNT%
 )
 
+:end
 echo.
 echo ===================================================
 echo   Nhấn phím bất kỳ để đóng cửa sổ này...

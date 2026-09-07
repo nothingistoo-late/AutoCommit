@@ -875,10 +875,10 @@ Write-Host ""SUCCESS""
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine($"  📥 Phát hiện {behindCount} commit mới trên remote origin/{config.Branch}.");
-                Console.WriteLine($"  🔄 Đang tự động kéo về và hợp nhất (pull --rebase)...");
+                Console.WriteLine($"  🔄 Đang tự động kéo về và hợp nhất (fetch & merge)...");
                 Console.ResetColor();
 
-                bool pullSuccess = PullWithRebaseAndAutoResolve(repoPath, config);
+                bool pullSuccess = PullWithMergeAndAutoResolve(repoPath, config);
                 if (pullSuccess)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
@@ -888,7 +888,7 @@ Write-Host ""SUCCESS""
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("  ⚠️ Không thể hoàn tất rebase tự động. Vui lòng kiểm tra xung đột.");
+                    Console.WriteLine("  ⚠️ Không thể hoàn tất hợp nhất tự động. Vui lòng kiểm tra xung đột.");
                     Console.ResetColor();
                 }
             }
@@ -903,7 +903,7 @@ Write-Host ""SUCCESS""
         }
     }
 
-    static bool PullWithRebaseAndAutoResolve(string repoPath, AppConfig config)
+    static bool PullWithMergeAndAutoResolve(string repoPath, AppConfig config)
     {
         var statusPorcelain = RunGit(repoPath, "status --porcelain", config);
         bool hasStash = false;
@@ -915,15 +915,15 @@ Write-Host ""SUCCESS""
 
         try
         {
-            var pullRes = RunGit(repoPath, $"pull --rebase origin {config.Branch}", config);
-            if (pullRes.ExitCode == 0)
+            var mergeRes = RunGit(repoPath, $"merge origin/{config.Branch} -m \"chore: sync remote commits into local branch\"", config);
+            if (mergeRes.ExitCode == 0)
             {
                 return true;
             }
 
-            if (IsRebaseInProgress(repoPath, config))
+            if (IsMergeInProgress(repoPath, config))
             {
-                bool resolved = TryResolveRebaseConflict(repoPath, config);
+                bool resolved = TryResolveMergeConflict(repoPath, config);
                 return resolved;
             }
 
@@ -938,85 +938,65 @@ Write-Host ""SUCCESS""
         }
     }
 
-    static bool IsRebaseInProgress(string repoPath, AppConfig config)
+    static bool IsMergeInProgress(string repoPath, AppConfig config)
     {
         var res = RunGit(repoPath, "status", config);
-        return res.StdOut.Contains("rebase in progress") || 
-               res.StdOut.Contains("You are currently rebasing") ||
-               res.StdOut.Contains("rebase --continue");
+        return res.StdOut.Contains("You have unmerged paths") || 
+               res.StdOut.Contains("All conflicts fixed but you are still merging") ||
+               res.StdOut.Contains("git merge --abort");
     }
 
-    static bool TryResolveRebaseConflict(string repoPath, AppConfig config)
+    static bool TryResolveMergeConflict(string repoPath, AppConfig config)
     {
-        int maxSteps = 50;
-        int step = 0;
+        var unmergedRes = RunGit(repoPath, "diff --name-only --diff-filter=U", config);
+        var conflictedFiles = unmergedRes.StdOut
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(f => f.Trim())
+            .ToList();
 
-        while (IsRebaseInProgress(repoPath, config) && step++ < maxSteps)
+        if (conflictedFiles.Count == 0)
         {
-            var unmergedRes = RunGit(repoPath, "diff --name-only --diff-filter=U", config);
-            var conflictedFiles = unmergedRes.StdOut
-                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(f => f.Trim())
-                .ToList();
+            var finishRes = RunGit(repoPath, $"commit -m \"chore: merge origin/{config.Branch}\"", config);
+            return finishRes.ExitCode == 0;
+        }
 
-            if (conflictedFiles.Count == 0)
+        bool allFilesAutoResolvable = true;
+        foreach (var relFile in conflictedFiles)
+        {
+            string fileName = Path.GetFileName(relFile);
+            string fullPath = Path.Combine(repoPath, relFile);
+
+            if (string.Equals(fileName, "autocommit_log.txt", StringComparison.OrdinalIgnoreCase))
             {
-                var contRes = RunGit(repoPath, "rebase --continue", config);
-                if (contRes.ExitCode == 0 && !IsRebaseInProgress(repoPath, config))
-                {
-                    return true;
-                }
-                continue;
+                ResolveLogFileConflict(fullPath);
+                RunGit(repoPath, $"add \"{EscapeQuote(relFile)}\"", config);
+                Console.WriteLine("  🔧 Đã tự động giải quyết xung đột trong autocommit_log.txt.");
             }
-
-            bool allFilesAutoResolvable = true;
-            foreach (var relFile in conflictedFiles)
+            else if (string.Equals(fileName, "INDEX.md", StringComparison.OrdinalIgnoreCase))
             {
-                string fileName = Path.GetFileName(relFile);
-                string fullPath = Path.Combine(repoPath, relFile);
-
-                if (string.Equals(fileName, "autocommit_log.txt", StringComparison.OrdinalIgnoreCase))
-                {
-                    ResolveLogFileConflict(fullPath);
-                    RunGit(repoPath, $"add \"{EscapeQuote(relFile)}\"", config);
-                    Console.WriteLine("  🔧 Đã tự động giải quyết xung đột trong autocommit_log.txt.");
-                }
-                else if (string.Equals(fileName, "INDEX.md", StringComparison.OrdinalIgnoreCase))
-                {
-                    ResolveIndexFileConflict(fullPath);
-                    RunGit(repoPath, $"add \"{EscapeQuote(relFile)}\"", config);
-                    Console.WriteLine("  🔧 Đã tự động giải quyết xung đột trong solutions/INDEX.md.");
-                }
-                else
-                {
-                    allFilesAutoResolvable = false;
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"  ❌ Phát hiện xung đột phức tạp trong tệp: {relFile}");
-                    Console.ResetColor();
-                    break;
-                }
+                ResolveIndexFileConflict(fullPath);
+                RunGit(repoPath, $"add \"{EscapeQuote(relFile)}\"", config);
+                Console.WriteLine("  🔧 Đã tự động giải quyết xung đột trong solutions/INDEX.md.");
             }
-
-            if (!allFilesAutoResolvable)
+            else
             {
-                Console.WriteLine("  ↩️ Đang hủy rebase (rebase --abort) để giữ an toàn cho mã nguồn...");
-                RunGit(repoPath, "rebase --abort", config);
-                return false;
-            }
-
-            var continueRes = RunGit(repoPath, "rebase --continue", config);
-            if (continueRes.ExitCode == 0 && !IsRebaseInProgress(repoPath, config))
-            {
-                return true;
+                allFilesAutoResolvable = false;
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  ❌ Phát hiện xung đột phức tạp trong tệp: {relFile}");
+                Console.ResetColor();
+                break;
             }
         }
 
-        bool finalState = !IsRebaseInProgress(repoPath, config);
-        if (!finalState)
+        if (!allFilesAutoResolvable)
         {
-            RunGit(repoPath, "rebase --abort", config);
+            Console.WriteLine("  ↩️ Đang hủy merge (merge --abort) để giữ an toàn cho mã nguồn...");
+            RunGit(repoPath, "merge --abort", config);
+            return false;
         }
-        return finalState;
+
+        var commitRes = RunGit(repoPath, $"commit -m \"chore: auto-resolved merge conflict with origin/{config.Branch}\"", config);
+        return commitRes.ExitCode == 0;
     }
 
     static void ResolveLogFileConflict(string fullPath)
@@ -1118,18 +1098,19 @@ Write-Host ""SUCCESS""
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("  ⚠️ Remote có commit mới chưa đồng bộ (non-fast-forward push).");
-                Console.WriteLine("  🔄 Đang tự động kéo về (pull --rebase) và hợp nhất xung đột...");
+                Console.WriteLine("  🔄 Đang tự động kéo về và hợp nhất (fetch & merge)...");
                 Console.ResetColor();
 
-                bool rebaseOk = PullWithRebaseAndAutoResolve(repoPath, config);
-                if (rebaseOk)
+                RunGit(repoPath, $"fetch origin {branch}", config);
+                bool mergeOk = PullWithMergeAndAutoResolve(repoPath, config);
+                if (mergeOk)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine("  ✅ Đã hợp nhất rebase thành công! Đang thử đẩy lại lên remote...");
+                    Console.WriteLine("  ✅ Đã hợp nhất thành công! Đang thử đẩy lại lên remote...");
                     Console.ResetColor();
 
-                    var pushAfterRebase = RunGit(repoPath, $"push origin {branch}", config);
-                    if (pushAfterRebase.ExitCode == 0)
+                    var pushAfterMerge = RunGit(repoPath, $"push origin {branch}", config);
+                    if (pushAfterMerge.ExitCode == 0)
                     {
                         return true;
                     }

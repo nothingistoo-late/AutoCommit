@@ -1,7 +1,7 @@
 # LeetCode 940: Distinct Subsequences II
 # Difficulty: Hard | Tags: String, Dynamic Programming
 # Link: https://leetcode.com/problems/distinct-subsequences-ii/
-# Solved on: 2026-09-06 16:55:10
+# Solved on: 2026-09-07 08:48:12
 
 class Solution:
     def solve(self, s: str, target: str) -> str:

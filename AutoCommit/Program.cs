@@ -57,10 +57,7 @@ class Program
             EnsureLocalGitConfig(repoPath, config);
 
             // Pre-run Remote Synchronization (Fetch & Pull Rebase if diverged or behind)
-            if (!cli.NoPush)
-            {
-                SyncRemoteBeforeExecution(repoPath, config);
-            }
+            SyncRemoteBeforeExecution(repoPath, config);
 
             var summaryLogs = new List<string>();
             var createdCommitMessages = new List<string>();

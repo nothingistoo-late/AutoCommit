@@ -56,6 +56,12 @@ class Program
             // Ensure local git config has user info set (fixes Task Scheduler environment quirks)
             EnsureLocalGitConfig(repoPath, config);
 
+            // Pre-run Remote Synchronization (Fetch & Pull Rebase if diverged or behind)
+            if (!cli.NoPush)
+            {
+                SyncRemoteBeforeExecution(repoPath, config);
+            }
+
             var summaryLogs = new List<string>();
             var createdCommitMessages = new List<string>();
 
@@ -849,6 +855,252 @@ Write-Host ""SUCCESS""
         RunGit(repoPath, $"config user.email \"{EscapeQuote(config.GitUser.Email)}\"", config);
     }
 
+    static void SyncRemoteBeforeExecution(string repoPath, AppConfig config)
+    {
+        try
+        {
+            var remotesRes = RunGit(repoPath, "remote", config);
+            if (!remotesRes.StdOut.Contains("origin"))
+            {
+                return;
+            }
+
+            Console.WriteLine($"\n🔄 Đang kiểm tra đồng bộ với remote origin/{config.Branch}...");
+            var fetchRes = RunGit(repoPath, $"fetch origin {config.Branch}", config);
+            if (fetchRes.ExitCode != 0)
+            {
+                Console.WriteLine($"  ℹ️ Không thể fetch từ remote (offline hoặc chưa cấu hình remote): {fetchRes.StdErr.Trim()}");
+                return;
+            }
+
+            var revListRes = RunGit(repoPath, $"rev-list --count {config.Branch}..origin/{config.Branch}", config);
+            if (revListRes.ExitCode == 0 && int.TryParse(revListRes.StdOut.Trim(), out int behindCount) && behindCount > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"  📥 Phát hiện {behindCount} commit mới trên remote origin/{config.Branch}.");
+                Console.WriteLine($"  🔄 Đang tự động kéo về và hợp nhất (pull --rebase)...");
+                Console.ResetColor();
+
+                bool pullSuccess = PullWithRebaseAndAutoResolve(repoPath, config);
+                if (pullSuccess)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("  ✅ Đã đồng bộ thành công với remote origin!");
+                    Console.ResetColor();
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("  ⚠️ Không thể hoàn tất rebase tự động. Vui lòng kiểm tra xung đột.");
+                    Console.ResetColor();
+                }
+            }
+            else
+            {
+                Console.WriteLine("  ✅ Nhánh local đã đồng bộ với remote.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ⚠️ Lỗi khi đồng bộ remote: {ex.Message}");
+        }
+    }
+
+    static bool PullWithRebaseAndAutoResolve(string repoPath, AppConfig config)
+    {
+        var statusPorcelain = RunGit(repoPath, "status --porcelain", config);
+        bool hasStash = false;
+        if (!string.IsNullOrWhiteSpace(statusPorcelain.StdOut))
+        {
+            var stashRes = RunGit(repoPath, "stash --include-untracked", config);
+            hasStash = stashRes.ExitCode == 0 && !stashRes.StdOut.Contains("No local changes to save");
+        }
+
+        try
+        {
+            var pullRes = RunGit(repoPath, $"pull --rebase origin {config.Branch}", config);
+            if (pullRes.ExitCode == 0)
+            {
+                return true;
+            }
+
+            if (IsRebaseInProgress(repoPath, config))
+            {
+                bool resolved = TryResolveRebaseConflict(repoPath, config);
+                return resolved;
+            }
+
+            return false;
+        }
+        finally
+        {
+            if (hasStash)
+            {
+                RunGit(repoPath, "stash pop", config);
+            }
+        }
+    }
+
+    static bool IsRebaseInProgress(string repoPath, AppConfig config)
+    {
+        var res = RunGit(repoPath, "status", config);
+        return res.StdOut.Contains("rebase in progress") || 
+               res.StdOut.Contains("You are currently rebasing") ||
+               res.StdOut.Contains("rebase --continue");
+    }
+
+    static bool TryResolveRebaseConflict(string repoPath, AppConfig config)
+    {
+        int maxSteps = 50;
+        int step = 0;
+
+        while (IsRebaseInProgress(repoPath, config) && step++ < maxSteps)
+        {
+            var unmergedRes = RunGit(repoPath, "diff --name-only --diff-filter=U", config);
+            var conflictedFiles = unmergedRes.StdOut
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(f => f.Trim())
+                .ToList();
+
+            if (conflictedFiles.Count == 0)
+            {
+                var contRes = RunGit(repoPath, "rebase --continue", config);
+                if (contRes.ExitCode == 0 && !IsRebaseInProgress(repoPath, config))
+                {
+                    return true;
+                }
+                continue;
+            }
+
+            bool allFilesAutoResolvable = true;
+            foreach (var relFile in conflictedFiles)
+            {
+                string fileName = Path.GetFileName(relFile);
+                string fullPath = Path.Combine(repoPath, relFile);
+
+                if (string.Equals(fileName, "autocommit_log.txt", StringComparison.OrdinalIgnoreCase))
+                {
+                    ResolveLogFileConflict(fullPath);
+                    RunGit(repoPath, $"add \"{EscapeQuote(relFile)}\"", config);
+                    Console.WriteLine("  🔧 Đã tự động giải quyết xung đột trong autocommit_log.txt.");
+                }
+                else if (string.Equals(fileName, "INDEX.md", StringComparison.OrdinalIgnoreCase))
+                {
+                    ResolveIndexFileConflict(fullPath);
+                    RunGit(repoPath, $"add \"{EscapeQuote(relFile)}\"", config);
+                    Console.WriteLine("  🔧 Đã tự động giải quyết xung đột trong solutions/INDEX.md.");
+                }
+                else
+                {
+                    allFilesAutoResolvable = false;
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"  ❌ Phát hiện xung đột phức tạp trong tệp: {relFile}");
+                    Console.ResetColor();
+                    break;
+                }
+            }
+
+            if (!allFilesAutoResolvable)
+            {
+                Console.WriteLine("  ↩️ Đang hủy rebase (rebase --abort) để giữ an toàn cho mã nguồn...");
+                RunGit(repoPath, "rebase --abort", config);
+                return false;
+            }
+
+            var continueRes = RunGit(repoPath, "rebase --continue", config);
+            if (continueRes.ExitCode == 0 && !IsRebaseInProgress(repoPath, config))
+            {
+                return true;
+            }
+        }
+
+        bool finalState = !IsRebaseInProgress(repoPath, config);
+        if (!finalState)
+        {
+            RunGit(repoPath, "rebase --abort", config);
+        }
+        return finalState;
+    }
+
+    static void ResolveLogFileConflict(string fullPath)
+    {
+        if (!File.Exists(fullPath)) return;
+
+        var allLines = File.ReadAllLines(fullPath);
+        var cleanLines = new List<string>();
+        var seenLines = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var line in allLines)
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("<<<<<<<") || 
+                trimmed.StartsWith("=======") || 
+                trimmed.StartsWith(">>>>>>>") || 
+                trimmed.StartsWith("|||||||"))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(trimmed))
+            {
+                if (seenLines.Add(trimmed))
+                {
+                    cleanLines.Add(line);
+                }
+            }
+            else
+            {
+                cleanLines.Add(line);
+            }
+        }
+
+        File.WriteAllLines(fullPath, cleanLines, System.Text.Encoding.UTF8);
+    }
+
+    static void ResolveIndexFileConflict(string fullPath)
+    {
+        if (!File.Exists(fullPath)) return;
+
+        var allLines = File.ReadAllLines(fullPath);
+        var tableRows = new List<string>();
+        var seenProblemKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var line in allLines)
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("<<<<<<<") || 
+                trimmed.StartsWith("=======") || 
+                trimmed.StartsWith(">>>>>>>") || 
+                trimmed.StartsWith("|||||||"))
+            {
+                continue;
+            }
+
+            if (trimmed.StartsWith("|") && trimmed.EndsWith("|") && !trimmed.Contains(":---") && !trimmed.Contains("Difficulty"))
+            {
+                var parts = trimmed.Split('|');
+                string key = trimmed;
+                if (parts.Length > 4)
+                {
+                    key = $"{parts[1].Trim()}_{parts[4].Trim()}";
+                }
+
+                if (seenProblemKeys.Add(key))
+                {
+                    tableRows.Add(trimmed);
+                }
+            }
+        }
+
+        string header = "# 📚 LeetCode Solutions & Polyglot Knowledge Archive\n\n" +
+                        "> Automated Daily Problem Solutions and Algorithm Snippets.\n\n" +
+                        "| ID | Title | Difficulty | Language | Solution File | Date |\n" +
+                        "| :--- | :--- | :--- | :--- | :--- | :--- |\n";
+
+        string content = header + string.Join("\n", tableRows) + "\n";
+        File.WriteAllText(fullPath, content, System.Text.Encoding.UTF8);
+    }
+
     static bool PushWithRetry(string repoPath, string branch, AppConfig config, int maxRetries = 3)
     {
         for (int attempt = 1; attempt <= maxRetries; attempt++)
@@ -857,6 +1109,41 @@ Write-Host ""SUCCESS""
             if (res.ExitCode == 0)
             {
                 return true;
+            }
+
+            string combinedError = $"{res.StdErr} {res.StdOut}".ToLowerInvariant();
+            bool isRejected = combinedError.Contains("rejected") || 
+                              combinedError.Contains("non-fast-forward") || 
+                              combinedError.Contains("fetch first") ||
+                              combinedError.Contains("need to be updated");
+
+            if (isRejected)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("  ⚠️ Remote có commit mới chưa đồng bộ (non-fast-forward push).");
+                Console.WriteLine("  🔄 Đang tự động kéo về (pull --rebase) và hợp nhất xung đột...");
+                Console.ResetColor();
+
+                bool rebaseOk = PullWithRebaseAndAutoResolve(repoPath, config);
+                if (rebaseOk)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("  ✅ Đã hợp nhất rebase thành công! Đang thử đẩy lại lên remote...");
+                    Console.ResetColor();
+
+                    var pushAfterRebase = RunGit(repoPath, $"push origin {branch}", config);
+                    if (pushAfterRebase.ExitCode == 0)
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("  ❌ Không thể tự động hợp nhất với remote do có xung đột phức tạp.");
+                    Console.ResetColor();
+                    return false;
+                }
             }
 
             Console.WriteLine($"  ⚠️ Lần thử {attempt}/{maxRetries} thất bại. Đang đợi thử lại...");
@@ -885,6 +1172,8 @@ Write-Host ""SUCCESS""
         psi.Environment["GIT_AUTHOR_EMAIL"] = config.GitUser.Email;
         psi.Environment["GIT_COMMITTER_NAME"] = config.GitUser.Name;
         psi.Environment["GIT_COMMITTER_EMAIL"] = config.GitUser.Email;
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        psi.Environment["GIT_EDITOR"] = "true";
 
         if (customDate.HasValue)
         {

@@ -49,6 +49,12 @@ class Program
 
             // Load configuration
             var config = AppConfig.Load(repoPath, cli.CustomConfigPath);
+            if (cli.ForceWhatTheCommit)
+            {
+                config.KnowledgeSync.Enabled = false;
+                config.WhatTheCommit.Enabled = true;
+                Console.WriteLine("🎲 Chế độ: Ép buộc sử dụng WhatTheCommit cho nội dung commit.");
+            }
             Console.WriteLine($"👤 Git User  : {config.GitUser.Name} <{config.GitUser.Email}>");
             Console.WriteLine($"🌿 Branch    : {config.Branch}");
             Console.WriteLine($"🌐 Languages : {string.Join(", ", config.Languages)}");
@@ -1226,6 +1232,7 @@ Tùy chọn chung:
   --fill-range <FROM>:<TO>          Bù commit cho một khoảng ngày (ví dụ: --fill-range 2026-08-15:2026-08-20)
   --count <số lượng>                Số lượng commit tạo ra mỗi ngày (ghi đè cấu hình)
   --no-push                         Chỉ tạo commit local, không đẩy lên remote
+  --wtc, --whatthecommit            Ép buộc sử dụng thông điệp commit từ whatthecommit.com (không sinh file LeetCode)
   --config <đường dẫn file JSON>    Chỉ định file cấu hình config.json khác
   --repo <đường dẫn thư mục repo>   Chỉ định thư mục repo Git
   -h, --help                        Hiển thị trợ giúp này
@@ -1349,6 +1356,7 @@ public class CliOptions
 {
     public bool ShowHelp { get; set; }
     public bool NoPush { get; set; }
+    public bool ForceWhatTheCommit { get; set; }
     public bool InstallTask { get; set; }
     public bool UninstallTask { get; set; }
     public string TaskTime { get; set; } = "09:15";
@@ -1391,6 +1399,10 @@ public class CliOptions
             else if (arg.Equals("--no-push", StringComparison.OrdinalIgnoreCase))
             {
                 opts.NoPush = true;
+            }
+            else if (arg.Equals("--whatthecommit", StringComparison.OrdinalIgnoreCase) || arg.Equals("--wtc", StringComparison.OrdinalIgnoreCase))
+            {
+                opts.ForceWhatTheCommit = true;
             }
             else if (arg.Equals("--count", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {

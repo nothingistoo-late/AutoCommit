@@ -26,3 +26,4 @@
 | 940 | [Distinct Subsequences II](https://leetcode.com/problems/distinct-subsequences-ii/) | **Hard** | 🟣 CSHARP | [Problem940_DistinctSubsequencesIi.cs](solutions/csharp/Problem940_DistinctSubsequencesIi.cs) | `2026-09-06` |
 | 940 | [Distinct Subsequences II](https://leetcode.com/problems/distinct-subsequences-ii/) | **Hard** | 🐍 PYTHON | [problem_0940_distinct_subsequences_ii.py](solutions/python/problem_0940_distinct_subsequences_ii.py) | `2026-09-06` |
 | 940 | [Distinct Subsequences II](https://leetcode.com/problems/distinct-subsequences-ii/) | **Hard** | 🔵 TYPESCRIPT | [problem_0940_distinct_subsequences_ii.ts](solutions/typescript/problem_0940_distinct_subsequences_ii.ts) | `2026-09-07` |
+| 3870 | [Count Commas in Range](https://leetcode.com/problems/count-commas-in-range/) | **Easy** | 🟣 CSHARP | [Problem3870_CountCommasInRange.cs](solutions/csharp/Problem3870_CountCommasInRange.cs) | `2026-09-08` |

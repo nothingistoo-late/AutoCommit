@@ -30,3 +30,4 @@
 | 3871 | [Count Commas in Range II](https://leetcode.com/problems/count-commas-in-range-ii/) | **Medium** | 🟣 CSHARP | [Problem3871_CountCommasInRangeIi.cs](solutions/csharp/Problem3871_CountCommasInRangeIi.cs) | `2026-09-09` |
 | 3871 | [Count Commas in Range II](https://leetcode.com/problems/count-commas-in-range-ii/) | **Medium** | 🐍 PYTHON | [problem_3871_count_commas_in_range_ii.py](solutions/python/problem_3871_count_commas_in_range_ii.py) | `2026-09-09` |
 | 3871 | [Count Commas in Range II](https://leetcode.com/problems/count-commas-in-range-ii/) | **Medium** | 🔵 TYPESCRIPT | [problem_3871_count_commas_in_range_ii.ts](solutions/typescript/problem_3871_count_commas_in_range_ii.ts) | `2026-09-09` |
+| 3871 | [Count Commas in Range II](https://leetcode.com/problems/count-commas-in-range-ii/) | **Medium** | 🩵 GOLANG | [problem_3871_count_commas_in_range_ii.go](solutions/golang/problem_3871_count_commas_in_range_ii.go) | `2026-09-09` |
